@@ -1,0 +1,12 @@
+newmtl Asphalt
+Kd 0.5 0.5 0.5
+
+newmtl Marking
+Kd 0.5 0.5 0.5
+
+newmtl Rail
+Kd 0.5 0.5 0.5
+
+newmtl Grass
+Kd 0.5 0.5 0.5
+

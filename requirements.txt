@@ -1,0 +1,6 @@
+numpy>=1.26
+matplotlib>=3.8
+pillow>=10.0
+# optional, for the SUMO coupling (ships with SUMO: %SUMO_HOME%\tools)
+# traci
+# sumolib

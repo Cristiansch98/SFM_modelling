@@ -1,0 +1,956 @@
+<title>EMV Yield-Field Lab</title>
+<style>
+  :root{
+    --ground:#101013; --panel:#17171c; --panel-2:#1d1d23; --inset:#0c0c0f;
+    --paint:#e8e6da; --paint-dim:#8f8d82; --ink:#f2f2ee; --ink-2:#b9b8ad; --ink-3:#7d7c74;
+    --hair:#2a2a31; --beacon-r:#e66767; --beacon-b:#9ec5f4; --data:#3987e5;
+    --seq-lo:#cde2fb; --seq-hi:#0d366b;
+    --st-unaware:#6a6a66; --st-noticed:#c98500; --st-yield:#d95926; --st-hold:#199e70;
+    --good:#0ca30c;
+    --disp:"Bahnschrift","DIN Alternate","Franklin Gothic Medium","Segoe UI",system-ui,sans-serif;
+    --body:"Segoe UI",system-ui,-apple-system,sans-serif;
+    --mono:"Cascadia Mono","Consolas",ui-monospace,monospace;
+  }
+  html{background:var(--ground)}
+  body{background:var(--ground);color:var(--ink);font-family:var(--body);
+       font-size:15px;line-height:1.55;margin:0;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1180px;margin:0 auto;padding:0 20px 80px}
+
+  /* ---------- header ---------- */
+  header{padding:34px 0 18px;display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap}
+  .eyebrow{font-family:var(--disp);font-stretch:condensed;letter-spacing:.18em;font-size:12px;
+           color:var(--ink-3);text-transform:uppercase;margin:0 0 6px}
+  h1{font-family:var(--disp);font-stretch:condensed;font-weight:700;font-size:clamp(30px,4.4vw,44px);
+     line-height:1.02;margin:0;letter-spacing:.01em;text-wrap:balance}
+  h1 .thin{font-weight:300;color:var(--ink-2)}
+  .sub{color:var(--ink-2);max-width:62ch;margin:10px 0 0;font-size:14.5px}
+  .beacon{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:9px;
+          background:var(--beacon-r);vertical-align:1px;animation:strobe 1s steps(1) infinite}
+  @keyframes strobe{0%{background:var(--beacon-r);box-shadow:0 0 14px 2px rgba(230,103,103,.55)}
+                    50%{background:var(--beacon-b);box-shadow:0 0 14px 2px rgba(158,197,242,.55)}}
+  @media (prefers-reduced-motion:reduce){.beacon{animation:none}}
+  .hdr-meta{font-family:var(--mono);font-size:11.5px;color:var(--ink-3);text-align:right;line-height:1.7}
+
+  /* dashed lane-marking divider */
+  .lane-rule{border:none;height:0;border-top:3px dashed var(--hair);margin:26px 0}
+
+  /* ---------- console ---------- */
+  .console{background:var(--panel);border:1px solid var(--hair);border-radius:10px;overflow:hidden}
+  #simcv{display:block;width:100%;height:300px;background:var(--inset)}
+  .console-grid{display:grid;grid-template-columns:minmax(300px,340px) 1fr;gap:0;border-top:1px solid var(--hair)}
+  @media (max-width:840px){.console-grid{grid-template-columns:1fr}}
+  .controls{padding:16px 18px;border-right:1px solid var(--hair);display:flex;flex-direction:column;gap:13px}
+  @media (max-width:840px){.controls{border-right:none;border-bottom:1px solid var(--hair)}}
+  .ctl-label{font-family:var(--disp);font-stretch:condensed;text-transform:uppercase;
+             letter-spacing:.14em;font-size:11px;color:var(--ink-3)}
+  .seg{display:flex;gap:6px;flex-wrap:wrap}
+  .seg button{flex:1;min-width:110px}
+  button{font-family:var(--disp);font-stretch:condensed;letter-spacing:.06em;font-size:13px;
+         background:var(--panel-2);color:var(--ink-2);border:1px solid var(--hair);
+         border-radius:6px;padding:7px 10px;cursor:pointer}
+  button:hover{color:var(--ink);border-color:var(--paint-dim)}
+  button:focus-visible{outline:2px solid var(--beacon-b);outline-offset:1px}
+  button.on{background:#26262e;color:var(--paint);border-color:var(--paint-dim)}
+  button.play{font-size:15px;padding:8px 14px}
+  .sliders{display:grid;grid-template-columns:1fr;gap:8px}
+  .sl{display:grid;grid-template-columns:150px 1fr 52px;align-items:center;gap:10px;font-size:12.5px;color:var(--ink-2)}
+  .sl .val{font-family:var(--mono);font-size:12px;color:var(--paint);text-align:right;font-variant-numeric:tabular-nums}
+  input[type=range]{accent-color:var(--data);height:22px;background:transparent}
+  input[type=range]:focus-visible{outline:2px solid var(--beacon-b);outline-offset:2px}
+  .btnrow{display:flex;gap:6px;flex-wrap:wrap}
+
+  .tele{padding:16px 18px;display:flex;flex-direction:column;gap:12px;min-width:0}
+  .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(118px,1fr));gap:8px}
+  .tile{background:var(--panel-2);border:1px solid var(--hair);border-radius:8px;padding:9px 11px 8px}
+  .tile .k{font-family:var(--disp);font-stretch:condensed;font-size:10.5px;letter-spacing:.13em;
+           text-transform:uppercase;color:var(--ink-3)}
+  .tile .v{font-family:var(--mono);font-size:22px;color:var(--ink);font-variant-numeric:tabular-nums;line-height:1.25}
+  .tile .u{font-size:11px;color:var(--ink-3);font-family:var(--mono)}
+  .tile.ev .v{color:var(--beacon-r)}
+  .sparks{display:grid;grid-template-columns:1fr 1fr;gap:8px;min-width:0}
+  @media (max-width:560px){.sparks{grid-template-columns:1fr}}
+  .spark{background:var(--panel-2);border:1px solid var(--hair);border-radius:8px;padding:8px 10px 4px;min-width:0}
+  .spark canvas{width:100%;height:64px;display:block}
+  .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:11.5px;color:var(--ink-2);align-items:center}
+  .sw{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+
+  /* ---------- tabs ---------- */
+  .tabs{display:flex;gap:2px;margin:34px 0 0;border-bottom:3px dashed var(--hair);flex-wrap:wrap}
+  .tabs button{border:none;background:none;border-radius:6px 6px 0 0;padding:9px 16px;font-size:14px}
+  .tabs button.on{background:var(--panel);color:var(--paint);border:1px solid var(--hair);border-bottom-color:var(--panel)}
+  .tabpane{background:var(--panel);border:1px solid var(--hair);border-top:none;border-radius:0 0 10px 10px;padding:24px 26px}
+  .tabpane h2{font-family:var(--disp);font-stretch:condensed;font-size:21px;margin:0 0 6px;letter-spacing:.02em}
+  .tabpane h3{font-family:var(--disp);font-stretch:condensed;font-size:16px;margin:26px 0 6px;color:var(--paint)}
+  .tabpane p{color:var(--ink-2);max-width:74ch;margin:8px 0}
+  .statrow{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin:16px 0 6px}
+  .stat{background:var(--panel-2);border:1px solid var(--hair);border-radius:8px;padding:13px 15px}
+  .stat .big{font-family:var(--mono);font-size:30px;font-variant-numeric:tabular-nums;line-height:1.15}
+  .stat .big.up{color:var(--good)}
+  .stat .cap{font-size:12px;color:var(--ink-3);margin-top:3px;line-height:1.45}
+  .chart{position:relative;margin:14px 0 4px}
+  .chart canvas{width:100%;display:block}
+  .chart .cap{font-size:12px;color:var(--ink-3);margin-top:7px;max-width:80ch}
+  #tip{position:fixed;pointer-events:none;background:#0c0c0fee;border:1px solid var(--paint-dim);
+       color:var(--ink);border-radius:6px;padding:6px 9px;font-family:var(--mono);font-size:11.5px;
+       display:none;z-index:50;white-space:pre;line-height:1.5}
+  .eq{background:var(--inset);border:1px solid var(--hair);border-radius:8px;padding:13px 18px;
+      font-family:var(--mono);font-size:14.5px;color:var(--paint);overflow-x:auto;margin:10px 0;white-space:nowrap}
+  .eq i{color:var(--beacon-b);font-style:normal}
+  .eq .c{color:var(--ink-3)}
+  table{border-collapse:collapse;font-size:13px;margin:12px 0;min-width:420px}
+  .tblwrap{overflow-x:auto}
+  th,td{padding:6px 13px;border-bottom:1px solid var(--hair);text-align:left;color:var(--ink-2)}
+  th{font-family:var(--disp);font-stretch:condensed;letter-spacing:.09em;text-transform:uppercase;
+     font-size:11px;color:var(--ink-3)}
+  td.num{font-family:var(--mono);font-variant-numeric:tabular-nums;color:var(--ink)}
+  .chips{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:12px 0;font-size:12.5px}
+  .chip{border-radius:15px;padding:4px 13px;font-family:var(--disp);font-stretch:condensed;letter-spacing:.08em}
+  .arrow{color:var(--ink-3);font-size:15px}
+  details{margin:10px 0;color:var(--ink-2);font-size:13px}
+  summary{cursor:pointer;color:var(--ink-3)}
+  footer{margin-top:34px;color:var(--ink-3);font-size:12.5px;line-height:1.8}
+  footer code{font-family:var(--mono);color:var(--ink-2);font-size:12px}
+  a{color:var(--beacon-b)}
+</style>
+
+<div class="wrap">
+<header>
+  <div>
+    <p class="eyebrow">Physics-informed traffic simulation &middot; social-force framework</p>
+    <h1><span class="beacon" aria-hidden="true"></span>YIELD-FIELD LAB<span class="thin"> / emergency-vehicle repulsion</span></h1>
+    <p class="sub">Every car is a particle in a force field: a driving force holds normal flow, an anisotropic
+    repulsion radiates from the emergency vehicle, and a corridor force clears its <em>predicted path</em>.
+    Perception gating decides when each driver feels the field. Drag the physics below &mdash; live.</p>
+  </div>
+  <div class="hdr-meta">calibrated 2026-07-14<br>LHS 41 + Nelder-Mead 60 &middot; loss 0.52<br>SUMO 1.26 bridge verified</div>
+</header>
+
+<!-- ============================ live console ============================ -->
+<div class="console">
+  <canvas id="simcv" height="300" aria-label="Live top-down traffic simulation following the emergency vehicle"></canvas>
+  <div class="console-grid">
+    <div class="controls">
+      <div>
+        <div class="ctl-label">Scenario</div>
+        <div class="seg" role="group" aria-label="scenario">
+          <button id="sc-ot" class="on">Motorway overtake</button>
+          <button id="sc-jam">Traffic jam &middot; Rettungsgasse</button>
+        </div>
+      </div>
+      <div class="sliders" id="sliders">
+        <div class="ctl-label">Force field</div>
+        <label class="sl">corridor strength A<sub>c</sub><input type="range" id="p-Ac" min="0" max="8" step="0.05"><span class="val" id="v-Ac"></span></label>
+        <label class="sl">corridor decay B<sub>c</sub> (m)<input type="range" id="p-Bc" min="0.4" max="3" step="0.05"><span class="val" id="v-Bc"></span></label>
+        <label class="sl">EV field strength A<input type="range" id="p-Aev" min="0" max="8" step="0.05"><span class="val" id="v-Aev"></span></label>
+        <label class="sl">EV field range B (m)<input type="range" id="p-Bev" min="5" max="40" step="0.5"><span class="val" id="v-Bev"></span></label>
+        <div class="ctl-label">Drivers &amp; traffic</div>
+        <label class="sl">anticipation T<sub>react</sub> (s)<input type="range" id="p-Tr" min="3" max="18" step="0.25"><span class="val" id="v-Tr"></span></label>
+        <label class="sl">non-compliers (%)<input type="range" id="p-nc" min="0" max="30" step="1"><span class="val" id="v-nc"></span></label>
+        <label class="sl">density (veh/km/lane)<input type="range" id="p-den" min="6" max="46" step="1"><span class="val" id="v-den"></span></label>
+        <label class="sl">EV desired speed (km/h)<input type="range" id="p-vev" min="20" max="160" step="2"><span class="val" id="v-vev"></span></label>
+      </div>
+      <div>
+        <div class="ctl-label">Presets</div>
+        <div class="btnrow">
+          <button id="pre-cal">&#9672; calibrated</button>
+          <button id="pre-off">no yielding</button>
+          <button id="pre-sub">below threshold</button>
+        </div>
+      </div>
+      <div class="btnrow">
+        <button id="btn-play" class="play" aria-label="play or pause">&#9654; run</button>
+        <button id="btn-reset">&#10227; reset</button>
+        <button id="btn-field">field overlay</button>
+        <button id="btn-vec">force vectors</button>
+      </div>
+    </div>
+    <div class="tele">
+      <div class="tiles">
+        <div class="tile ev"><div class="k">EV speed</div><div class="v" id="t-vev">&ndash;</div><div class="u">km/h</div></div>
+        <div class="tile"><div class="k">of desired</div><div class="v" id="t-ratio">&ndash;</div><div class="u">%</div></div>
+        <div class="tile"><div class="k">clear ahead</div><div class="v" id="t-clr">&ndash;</div><div class="u">m</div></div>
+        <div class="tile"><div class="k">yielding now</div><div class="v" id="t-ny">&ndash;</div><div class="u">vehicles</div></div>
+        <div class="tile"><div class="k">min TTC (5 s)</div><div class="v" id="t-ttc">&ndash;</div><div class="u">s</div></div>
+        <div class="tile"><div class="k">sim time</div><div class="v" id="t-t">&ndash;</div><div class="u">s</div></div>
+      </div>
+      <div class="sparks">
+        <div class="spark"><div class="ctl-label">EV speed (km/h)</div><canvas id="sp-v" height="64"></canvas></div>
+        <div class="spark"><div class="ctl-label">clear corridor ahead (m)</div><canvas id="sp-c" height="64"></canvas></div>
+      </div>
+      <div class="legend" aria-hidden="false">
+        <span><span class="sw" style="background:var(--st-unaware)"></span>unaware</span>
+        <span><span class="sw" style="background:var(--st-noticed)"></span>noticed</span>
+        <span><span class="sw" style="background:var(--st-yield)"></span>yielding</span>
+        <span><span class="sw" style="background:var(--st-hold)"></span>hold</span>
+        <span><span class="sw" style="background:var(--beacon-r)"></span>emergency vehicle</span>
+        <span style="color:var(--ink-3)">&middot; red band = predicted-path corridor</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================ tabs ============================ -->
+<div class="tabs" role="tablist">
+  <button class="on" data-tab="results" role="tab">Results</button>
+  <button data-tab="phase" role="tab">Phase diagram</button>
+  <button data-tab="physics" role="tab">The physics</button>
+  <button data-tab="sumo" role="tab">SUMO bridge</button>
+</div>
+
+<div class="tabpane" id="tab-results" role="tabpanel">
+  <h2>What yielding buys the emergency vehicle</h2>
+  <p>Identical seeded traffic, with and without the repulsion model. Metrics from the calibrated
+     standalone simulator (out/summary.json).</p>
+  <div class="statrow" id="statrow"></div>
+  <div class="chart"><canvas id="ch-traces" height="300"></canvas>
+    <div class="cap">EV speed over time. Hue = scenario (blue motorway, orange jam); solid = force model, dashed = no yielding.
+    Without yielding the motorway EV is trapped behind platoons (~102&nbsp;km/h) and the jam EV crawls at ~9&nbsp;km/h.</div></div>
+  <div class="chart"><canvas id="ch-react" height="250"></canvas>
+    <div class="cap">Yield-onset distance ahead of the EV, motorway scenario. The perception + urgency gating produces
+    onsets of 100&ndash;140&nbsp;m (mean 103&nbsp;m), inside the empirically reported band; the early tail is cars that spawned close to the EV.</div></div>
+</div>
+
+<div class="tabpane" id="tab-phase" style="display:none" role="tabpanel">
+  <h2>Corridor formation is a depinning transition</h2>
+  <p>Lane keeping is a periodic &ldquo;washboard&rdquo; potential with maximum restoring acceleration
+     a<sub>pin</sub>. A car leaves its lane only when the corridor force exceeds it &mdash; so the model
+     predicts corridor formation at A<sub>c</sub> &gt; a<sub>pin</sub>, independent of density to first order.
+     The sweep below (81 simulations) confirms it: the failure region sits under the analytic threshold.</p>
+  <div class="chart"><canvas id="ch-phase" height="360"></canvas>
+    <div class="cap">EV mean-speed ratio vs traffic density and corridor strength; hover cells for values.
+    Lines: analytic depinning threshold A<sub>c</sub> = a<sub>pin</sub> = 1.4 m/s&sup2; (solid) and with full urgency
+    relief 0.7 m/s&sup2; (dashed). Above threshold the EV holds &ge;95% of its desired speed at all tested densities.</div></div>
+  <details><summary>table view</summary><div class="tblwrap"><table id="tbl-phase"></table></div></details>
+</div>
+
+<div class="tabpane" id="tab-physics" style="display:none" role="tabpanel">
+  <h2>Three forces, one gate</h2>
+  <p>Each vehicle (unit mass) integrates a superposition of specific forces
+     (semi-implicit Euler, &Delta;t = 0.05 s). Social terms are bounded by an IDM car-following
+     demand, so safety always wins:
+     a<sub>x</sub> = a<sub>drive</sub> + min(a<sub>social</sub>, a<sub>IDM</sub>).</p>
+  <h3>1 &middot; Driving force &mdash; keeps normal flow</h3>
+  <div class="eq"><i>F</i><sub>drive</sub> = ( <i>v</i><sup>0</sup><i>x&#770;</i> &minus; <i>v</i> ) / <i>&tau;</i> <span class="c">&nbsp;&nbsp;&tau; &asymp; 0.55 s</span></div>
+  <h3>2 &middot; Anisotropic EV repulsion &mdash; the siren as a field source</h3>
+  <div class="eq"><i>F</i><sub>EV</sub> = <i>A</i> e<sup>(r &minus; d)/B</sup> &middot; <i>n&#770;</i> &middot; [ <i>&lambda;</i> + (1&minus;<i>&lambda;</i>)(1+cos&thinsp;<i>&phi;</i>)/2 ]
+    <span class="c">&nbsp;&nbsp;A = 2.15 m/s&sup2;, B = 21.4 m, &lambda; = 0.10 &rarr; forward-focused</span></div>
+  <h3>3 &middot; Corridor repulsion &mdash; repel from the predicted path, not the position</h3>
+  <div class="eq"><i>F</i><sub>c,&perp;</sub> = <i>A</i><sub>c</sub> e<sup>&minus;(|d<sub>&perp;</sub>| &minus; w)&#8330;/B<sub>c</sub></sup> &middot; <i>u</i>(t<sub>arr</sub>) &middot; <i>&sigma;</i> ,
+    &nbsp; <i>F</i><sub>c,&#8741;</sub> = &minus;<i>&gamma;</i><sub>c</sub> <i>u</i> &middot; blocked &middot; (v &minus; &kappa;v<sup>0</sup>)&#8330;
+    <span class="c">&nbsp;&nbsp;path projected T<sub>pred</sub> = 8 s ahead</span></div>
+  <h3>The gate: perception &amp; urgency</h3>
+  <div class="chips">
+    <span class="chip" style="background:#33332f;color:#c9c8bd">UNAWARE</span><span class="arrow">&rarr;</span>
+    <span class="chip" style="background:#3a2c07;color:#eda100">NOTICED <span style="opacity:.6">detection R, delay ~logN</span></span><span class="arrow">&rarr;</span>
+    <span class="chip" style="background:#40200f;color:#f08e5e">YIELDING <span style="opacity:.6">side chosen, hysteresis</span></span><span class="arrow">&rarr;</span>
+    <span class="chip" style="background:#0e2f22;color:#3fbf8f">HOLD</span><span class="arrow">&rarr;</span>
+    <span class="chip" style="background:#33332f;color:#c9c8bd">merge back</span>
+  </div>
+  <div class="eq"><i>u</i> = max[ &sigma;((T<sub>react</sub><sup>eff</sup> &minus; t<sub>arr</sub>)/&sigma;<sub>t</sub>) , jam &middot; &sigma;((R<sub>urgent</sub> &minus; s)/&sigma;<sub>s</sub>) ]
+    <span class="c">&nbsp;&nbsp;anticipation stretches as own speed drops (rescue-lane pre-forming)</span></div>
+  <h3>Why lane changes are a phase transition</h3>
+  <p>Lane discipline is the washboard potential U(y) = &minus;a<sub>pin</sub>(w/2&pi;)&thinsp;cos(2&pi;(y&minus;w/2)/w).
+     The corridor force tilts it; cars depin when A<sub>c</sub>&thinsp;u &gt; a<sub>pin</sub><sup>eff</sup>, and the cleared
+     half-width follows analytically:</p>
+  <div class="eq">d* = w<sub>need</sub> + B<sub>c</sub> ln( A<sub>c</sub> / a<sub>pin</sub><sup>eff</sup> ) = 2.5 + 0.75&thinsp;ln(3.76/0.7) &asymp; <i>3.8 m</i>
+    <span class="c">&nbsp;&nbsp;measured median displacement at the EV: 3.8&ndash;4.2 m &#10003;</span></div>
+  <div class="chart"><canvas id="ch-field" height="300"></canvas>
+    <div class="cap">The combined field around the EV (arrow = direction, shade = magnitude): weak behind (&lambda; = 0.1),
+    a keel of corridor force along the predicted path ahead.</div></div>
+  <h3>Calibrated parameters</h3>
+  <div class="tblwrap"><table id="tbl-params"></table></div>
+</div>
+
+<div class="tabpane" id="tab-sumo" style="display:none" role="tabpanel">
+  <h2>Hybrid projection onto SUMO</h2>
+  <p>SUMO stays authoritative for car-following and insertion; the force model supplies yielding.
+     Longitudinal force maps to <code style="font-family:var(--mono)">slowDown()</code> (SUMO&rsquo;s safe-speed
+     logic still binds), lateral force maps to a target sublane offset y<sub>t</sub> = clamp(F<sub>&perp;</sub>/k),
+     tracked with rate-limited increments &mdash; the discrete, overshoot-free equivalent of a critically damped
+     spring &mdash; and a lateral-gap veto. The same Python functions compute the fields in both worlds.</p>
+  <div class="chart"><canvas id="ch-sumo" height="270"></canvas>
+    <div class="cap" id="sumo-cap"></div></div>
+  <p>SUMO&rsquo;s bluelight device is the purpose-built reference behaviour; the force bridge reaches
+     comparable EV progress while adding what the device lacks &mdash; continuous perception onset,
+     urgency timing, and per-driver compliance &mdash; and exposes every knob to calibration.</p>
+</div>
+
+<footer>
+  <b style="color:var(--ink-2)">Reproduce:</b> <code>python experiments/run_all.py</code> &middot;
+  <code>python experiments/run_calibration.py</code> &middot;
+  <code>python experiments/run_sumo_compare.py</code><br>
+  Framework: <code>emv/</code> (forces &middot; perception &middot; dynamics &middot; calibrate &middot; sumo bridge) &mdash;
+  full derivation in <code>docs/FRAMEWORK.md</code>, literature anchors [1]&ndash;[27] in the repo review.
+  Model: Helbing&ndash;Moln&aacute;r social force [2] + IDM [4] + predicted-corridor repulsion (gap 1) + perception gating (gap 2).
+</footer>
+</div>
+<div id="tip"></div>
+
+<script>
+"use strict";
+if(!CanvasRenderingContext2D.prototype.roundRect){
+  CanvasRenderingContext2D.prototype.roundRect=function(x,y,w,h){this.rect(x,y,w,h);return this;};}
+/* ==================== embedded experiment data ==================== */
+const DATA = {"params":{"A_ev":2.152,"B_ev":21.406,"lam_ev":0.1,"A_c":3.758,"B_c":0.748,"T_react":15.944,"gamma_c":0.72,"a_pin":1.4,"T_pred":8.0,"R_front":140.0,"R_urgent":90.0},"metrics":{"overtake":{"ev_mean_speed":35.901,"ev_speed_ratio":0.997,"t_clear":0.0,"min_ttc":5.079,"collisions":0,"react_dist_mean":103.325,"p95_decel":0.072,"p95_alat":0.048,"disruption":0.042,"n_yielded":39},"overtake_base":{"ev_mean_speed":28.388,"ev_speed_ratio":0.789,"min_ttc":3.902,"collisions":0},"jam":{"ev_mean_speed":8.503,"ev_speed_ratio":0.945,"t_clear":8.4,"min_ttc":1.916,"collisions":0,"react_dist_mean":110.086,"disruption":0.302,"n_yielded":119},"jam_base":{"ev_mean_speed":2.479,"ev_speed_ratio":0.275,"min_ttc":0.976,"collisions":0}},
+"react":[41.1,126.5,27.2,11.3,131.2,95.4,18.8,131.2,96.5,129.6,125.5,113.3,5.4,116.0,122.6,98.9,117.3,77.6,113.7,134.9,115.2,118.9,129.3,90.2,124.3,112.4,109.7,119.8,108.4,111.2,127.2,116.7,127.5,96.3,124.8,120.0,123.6,118.6,101.8],
+"traces":{"overtake":{"t":[0,0.5,1.1,1.7,2.3,2.9,3.4,4,4.6,5.2,5.8,6.3,6.9,7.5,8.1,8.7,9.3,9.8,10.4,11,11.6,12.2,12.7,13.3,13.9,14.5,15.1,15.7,16.2,16.8,17.4,18,18.6,19.1,19.7,20.3,20.9,21.5,22.1,22.6,23.2,23.8,24.4,25,25.5,26.1,26.7,27.3,27.9,28.5,29,29.6,30.2,30.8,31.4,31.9,32.5,33.1,33.7,34.3,34.8,35.4,36,36.6,37.2,37.8,38.3,38.9,39.5,40.1,40.7,41.2,41.8,42.4,43,43.6,44.2,44.7,45.3,45.9,46.5,47.1,47.6,48.2,48.8,49.4,50,50.6,51.1,51.7,52.3,52.9,53.5,54,54.6,55.2,55.8,56.4,57,57.5,58.1,58.7,59.3,59.9,60.4,61,61.6,62.2,62.8,63.4],"v":[30,31.6,33.52,35.3,35.86,35.97,35.99,36,36,36,36,36,36,36,36,36,36,36,36,36,36,36,36,36,36,36,36,36,36,36,36,36,36,36,35.99,35.99,35.99,36,36,36,36,36,36,35.99,35.99,35.99,36,36,36,36,36,36,36,36,35.99,35.99,35.99,36,36,36,36,36,36,36,36,36,36,36,36,36,36,36,36,36,36,36,36,35.99,36,36,36,36,36,36,36,36,36,36,36,36,36,36,36,36,36,35.99,36,36,36,36,36,35.99,36,36,36,36,36,36,36,36]},
+"overtake_base":{"t":[0,0.7,1.4,2.1,2.8,3.5,4.2,5,5.7,6.4,7.1,7.8,8.5,9.2,10,10.7,11.4,12.1,12.8,13.5,14.2,15,15.7,16.4,17.1,17.8,18.5,19.2,20,20.7,21.4,22.1,22.8,23.5,24.2,25,25.7,26.4,27.1,27.8,28.5,29.3,30,30.7,31.4,32.1,32.8,33.5,34.3,35,35.7,36.4,37.1,37.8,38.5,39.3,40,40.7,41.4,42.1,42.8,43.5,44.3,45,45.7,46.4,47.1,47.8,48.5,49.3,50,50.7,51.4,52.1,52.8,53.6,54.3,55,55.7,56.4,57.1,57.8,58.6,59.3,60,60.7,61.4,62.1,62.8,63.6,64.3,65,65.7,66.4,67.1,67.8,68.6,69.3,70,70.7,71.4,72.1,72.8,73.6,74.3,75,75.7,76.4,77.1,77.9],"v":[30,32.24,34.48,35.76,35.96,35.99,36,36,36,36,36,36,36,36,36,36,36,36,36,35.02,34.66,34.39,34.11,33.78,33.39,32.93,32.39,31.8,31.06,30.39,29.72,29.11,28.55,28.08,27.69,27.34,27.11,26.93,26.79,26.68,26.59,26.51,26.45,26.4,26.36,26.32,25.31,24.06,23.29,23.01,23,23.27,24.71,26.95,29.19,29.24,28.52,27.9,27.19,25.01,23.66,23,23,24.55,26.79,29.02,28.61,27.94,25.98,24.22,26.04,27.61,27.1,26.7,26.4,26.15,26,25.7,23.97,22.89,22.32,22.12,22.23,22.8,24.91,27.15,29.39,29.34,28.38,25.11,26.8,27.73,27.18,26.74,26.4,26.16,25.97,25.86,25.78,25.73,25.69,25.67,25.65,25.64,25.63,25.63,25.63,25.62,25.62,25.62]},
+"jam":{"t":[0,0.6,1.2,1.9,2.5,3.2,3.8,4.4,5.1,5.7,6.4,7,7.6,8.3,8.9,9.6,10.2,10.9,11.5,12.1,12.8,13.4,14.1,14.7,15.3,16,16.6,17.3,17.9,18.5,19.2,19.8,20.5,21.1,21.8,22.4,23,23.7,24.3,25,25.6,26.2,26.9,27.5,28.2,28.8,29.4,30.1,30.7,31.4,32,32.7,33.3,33.9,34.6,35.2,35.9,36.5,37.1,37.8,38.4,39.1,39.7,40.4,41,41.6,42.3,42.9,43.6,44.2,44.8,45.5,46.1,46.8,47.4,48,48.7,49.3,50,50.6,51.3,51.9,52.5,53.2,53.8,54.5,55.1,55.7,56.4,57,57.7,58.3,58.9,59.6,60.2,60.9,61.5,62.2,62.8,63.4,64.1,64.7,65.4,66,66.6,67.3,67.9,68.6,69.2,69.9],"v":[6,7.9,8.66,8.77,8.75,8.67,8.57,8.42,8.15,7.82,7.32,6.53,5.59,6.49,8.1,8.53,8.85,8.96,8.96,8.92,8.9,8.88,8.86,8.83,8.79,8.73,8.65,8.52,8.33,8.05,7.64,7.14,6.25,7.41,8.69,8.88,8.95,8.99,9,9,9,8.99,8.99,8.98,8.98,8.98,8.98,8.97,8.97,8.97,8.98,8.97,8.92,8.91,8.89,8.86,8.83,8.8,8.75,8.67,8.56,8.37,8.1,7.67,7.22,6.55,7.45,8.65,8.91,8.97,9,8.99,8.97,8.93,8.89,8.84,8.76,8.69,8.58,8.45,8.35,8.16,7.63,6.41,5.53,7.68,8.73,8.95,8.99,8.99,8.98,8.97,8.97,8.97,8.98,8.99,9,9,9,9,8.99,8.98,8.98,8.99,9,9,8.99,8.94,8.92,8.9]},
+"jam_base":{"t":[0,0.6,1.2,1.9,2.5,3.2,3.8,4.4,5.1,5.7,6.4,7,7.6,8.3,8.9,9.6,10.2,10.9,11.5,12.1,12.8,13.4,14.1,14.7,15.3,16,16.6,17.3,17.9,18.5,19.2,19.8,20.5,21.1,21.8,22.4,23,23.7,24.3,25,25.6,26.2,26.9,27.5,28.2,28.8,29.4,30.1,30.7,31.4,32,32.7,33.3,33.9,34.6,35.2,35.9,36.5,37.1,37.8,38.4,39.1,39.7,40.4,41,41.6,42.3,42.9,43.6,44.2,44.8,45.5,46.1,46.8,47.4,48,48.7,49.3,50,50.6,51.3,51.9,52.5,53.2,53.8,54.5,55.1,55.7,56.4,57,57.7,58.3,58.9,59.6,60.2,60.9,61.5,62.2,62.8,63.4,64.1,64.7,65.4,66,66.6,67.3,67.9,68.6,69.2,69.9],"v":[6,7.9,8.66,8.77,8.75,8.67,8.57,8.42,8.15,7.89,7.47,6.93,6.02,4.23,2.72,1.8,1.6,1.56,1.56,1.58,1.68,1.04,1.36,1.92,1.72,1.27,1.54,2.07,1.76,1.44,1.75,1.75,1.75,1.76,1.69,1.65,1.64,1.78,1.68,1.66,1.66,1.66,1.66,1.67,1.67,1.68,1.69,1.7,1.74,2.13,2.03,1.61,1.6,2.18,1.64,1.48,2.25,1.89,1.4,2.07,2.03,1.47,1.49,2.36,1.97,1.4,1.58,2.45,1.97,1.39,1.41,2.64,2.04,1.48,1.24,1.93,2.24,1.99,1.16,1.46,2.82,2.09,1.49,1.15,1.98,2.47,1.92,1.03,1.66,2.56,1.89,1.2,1.62,2.3,1.98,1.54,1.76,2,1.88,1.78,1.84,1.87,1.85,1.85,1.87,1.87,1.2,0.8,0.98,2.25]}},
+"phase":{"d":[8,12,16,20,24,28,32,36,40],"ac":[0.35,0.7,1.05,1.4,2.1,2.8,4.2,5.6,7],"r":[[0.902,0.819,0.868,0.885,0.812,0.806,0.798,0.762,0.741],[0.94,0.945,0.929,0.885,0.812,0.887,0.838,0.811,0.793],[0.965,0.964,0.939,0.934,0.901,0.91,0.896,0.847,0.858],[0.984,0.99,0.961,0.967,0.955,0.924,0.913,0.899,0.875],[0.994,0.995,0.993,0.99,0.99,0.986,0.973,0.953,0.957],[0.995,0.995,0.993,0.995,0.995,0.99,0.992,0.989,0.968],[0.995,0.995,0.995,0.995,0.995,0.995,0.995,0.995,0.975],[0.995,0.995,0.995,0.995,0.995,0.995,0.995,0.995,0.974],[0.995,0.995,0.995,0.995,0.995,0.995,0.995,0.995,0.976]]},
+"sumo":{"none":{"seg_time":91.2,"seg_speed":24.085,"clearance_mean":27.011,"collisions":0},"bluelight":{"seg_time":71.9,"seg_speed":30.546,"clearance_mean":30.601,"collisions":0},"force":{"seg_time":82.7,"seg_speed":26.541,"clearance_mean":72.669,"collisions":0}}};
+
+/* ==================== the physics (port of emv/) ==================== */
+const P0 = {tau:0.55, tauEv:0.40, aMax:2.6, bComf:3.0, bEmerg:8.0, s0:2.0,
+  overlapM:0.5, evOverlapM:0.35, boost:1.35, evT:0.6, evS0:1.5, evB:4.0, evAmax:3.2,
+  aPin:1.4, zeta:1.0, pinRelief:0.5, aWall:8.0, bWall:0.35, aLatMax:3.0, vLatMax:2.2,
+  evOm:1.3, evZeta:1.0, weaveLook:30, weaveMargin:0.4, weaveMax:1.6,
+  Av:2.5, Bxv:5.0, Byv:0.9, Anear:6.0, qNear:0.25, lamV:0.25, FcapV:5.0, cutoff:70,
+  Aev:2.152, Bev:21.406, lamEv:0.10, rEv:3.0, FcapEv:4.5,
+  Ac:3.758, Bc:0.748, marginC:0.5, Tpred:8.0, LpredMin:120, LpredMax:260, Lback:6,
+  endRamp:30, gammaC:0.72, kappa:0.82, vAppFloor:0.6,
+  Treact:15.944, sigT:2.2, jamAnt:2.5, vManRef:15, Rurgent:90, sigS:12,
+  Rfront:140, Rrear:60, delayMed:1.0, delaySig:0.45, pNC:0.05,
+  holdLo:1.5, holdHi:4.0, sPassed:8, rightBias:1.2, dt:0.05};
+let P = Object.assign({}, P0);
+
+const UNAWARE=0, NOTICED=1, YIELD=2, HOLD=3;
+const ST_COL = ["#6a6a66","#c98500","#d95926","#199e70"];
+
+function mulberry(seed){let a=seed>>>0;return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+function randn(rng){let u=1-rng(),v=rng();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v)}
+
+class Sim{
+  constructor(scn, opts){
+    this.scn = scn; this.t = 0;
+    const rng = mulberry(opts.seed*2654435761+12345);
+    this.rng = rng;
+    const road = scn==="jam" ?
+      {n:3,w:3.5,shR:2.5,shL:1.0,len:99999} : {n:3,w:3.5,shR:2.0,shL:0.8,len:99999};
+    road.yMin=-road.shR; road.yMax=road.n*road.w+road.shL; this.road=road;
+    const cars=[];
+    if(scn==="jam"){
+      const sp = 1000/Math.max(opts.den,20)*0.9 + 6;   // density -> crawl spacing
+      for(let k=0;k<3;k++){let x=70+rng()*sp;
+        while(x<1600){cars.push({x:x+(rng()-0.5)*3.6,y:(k+0.5)*road.w+(rng()-0.5)*0.5,
+          v0:Math.max(2.5+randn(rng)*0.5,0.8),lane:k}); x+=sp;}}
+      this.yCorr = 2*road.w;
+      this.ev={x:20,y:this.yCorr,v:6,v0:Math.min(opts.vEv,12)};
+    } else {
+      const sp = 1000/opts.den;
+      const ls=[24.5,27.5,30.0];
+      for(let k=0;k<3;k++){let x=200+rng()*sp;
+        while(x<2600){cars.push({x:x+(rng()-0.5)*0.36*sp,y:(k+0.5)*road.w+(rng()-0.5)*0.5,
+          v0:Math.max(ls[k]+randn(rng)*1.2,4),lane:k}); x+=sp;}}
+      this.yCorr = 1.5*road.w;
+      this.ev={x:40,y:this.yCorr,v:Math.min(30,opts.vEv),v0:opts.vEv};
+    }
+    const n=cars.length+1; this.n=n;
+    const F=()=>new Float64Array(n);
+    this.x=F();this.y=F();this.vx=F();this.vy=F();this.L=F();this.W=F();
+    this.v0=F();this.tau=F();this.Thw=F();this.aware=new Int8Array(n);
+    this.side=new Int8Array(n);this.tReact=F();this.holdU=F();this.delay=F();
+    this.comply=new Uint8Array(n);this.u=F();this.ax=F();this.ay=F();
+    this.x[0]=this.ev.x;this.y[0]=this.ev.y;this.vx[0]=this.ev.v;this.v0[0]=this.ev.v0;
+    this.L[0]=6.2;this.W[0]=2.2;this.tau[0]=P.tauEv;this.Thw[0]=P.evT;this.comply[0]=1;
+    cars.sort((a,b)=>a.x-b.x);
+    for(let i=1;i<n;i++){const c=cars[i-1];
+      this.x[i]=c.x;this.y[i]=c.y;this.vx[i]=c.v0*0.95;this.v0[i]=c.v0;
+      this.L[i]=4.5;this.W[i]=1.8;this.tau[i]=P.tau;this.Thw[i]=1.1+rng()*0.7;
+      this.tReact[i]=1e18;this.holdU[i]=1e18;
+      this.delay[i]=Math.exp(Math.log(P.delayMed)+P.delaySig*randn(rng));
+      this.comply[i]=rng()>=opts.pnc?1:0;}
+    this.yielding = opts.yielding!==false;
+    this.minTTCwin=[];
+  }
+  corr(){const vP=Math.max(this.vx[0],P.vAppFloor*this.v0[0]);
+    return {x0:this.x[0]+0.5*this.L[0], yC:this.yCorr,
+            L:Math.min(Math.max(vP*P.Tpred,P.LpredMin),P.LpredMax)};}
+  perception(c){
+    const n=this.n;
+    if(!this.yielding){this.u.fill(0);return;}
+    const vApp=Math.max(this.vx[0],P.vAppFloor*this.v0[0]);
+    for(let i=1;i<n;i++){
+      const s=this.x[i]-c.x0, d=Math.hypot(this.x[i]-this.x[0],this.y[i]-this.y[0]);
+      const ahead=s>=0;
+      if(this.aware[i]===UNAWARE && this.comply[i] && d<(ahead?P.Rfront:P.Rrear)){
+        this.aware[i]=NOTICED; this.tReact[i]=this.t+this.delay[i];}
+      if(this.aware[i]===NOTICED && this.t>=this.tReact[i]){
+        this.aware[i]=YIELD;
+        const dl=this.y[i]-c.yC;
+        if(Math.abs(dl)>=0.35) this.side[i]=dl>0?1:-1;
+        else{const rl=(this.road.yMax-0.5*this.W[i])-this.y[i],
+                   rr=(this.y[i]-0.5*this.W[i])-this.road.yMin+P.rightBias;
+             this.side[i]=rl>rr?1:-1;}}
+      if(this.aware[i]===YIELD && s<-P.sPassed){
+        this.aware[i]=HOLD; this.holdU[i]=this.t+P.holdLo+this.rng()*(P.holdHi-P.holdLo);}
+      if(this.aware[i]===HOLD && this.t>=this.holdU[i]){this.aware[i]=UNAWARE;this.side[i]=0;}
+      // urgency
+      let u=0;
+      if(this.aware[i]===YIELD){
+        const jam=Math.min(Math.max(1-this.vx[i]/P.vManRef,0),1);
+        const tArr=ahead? s/Math.max(vApp-this.vx[i],0.5) : 0;
+        const Teff=P.Treact*(1+P.jamAnt*jam);
+        const ut=1/(1+Math.exp(Math.min(Math.max((tArr-Teff)/P.sigT,-40),40)));
+        const up=jam/(1+Math.exp(Math.min(Math.max((s-P.Rurgent)/P.sigS,-40),40)));
+        u=Math.max(ut,up);}
+      this.u[i]=u;}
+  }
+  step(){
+    const n=this.n, c=this.corr(); this.perception(c);
+    const {x,y,vx,vy,L,W,v0,tau,u}=this;
+    const fx=new Float64Array(n), fy=new Float64Array(n), idm=new Float64Array(n).fill(1e9);
+    // pair interactions
+    for(let i=0;i<n;i++){
+      for(let j=0;j<n;j++){
+        if(i===j) continue;
+        const dxx=x[j]-x[i]; if(Math.abs(dxx)>P.cutoff) continue;
+        const dyy=y[j]-y[i];
+        const hL=0.5*(L[i]+L[j]), hW=0.5*(W[i]+W[j]);
+        const gx=Math.max(Math.abs(dxx)-hL,0.05), gy=Math.max(Math.abs(dyy)-hW,0.05);
+        const q=Math.hypot(gx/P.Bxv,gy/P.Byv);
+        let mag=P.Av*Math.exp(-q)+P.Anear*Math.exp(-q/P.qNear);
+        const d=Math.hypot(dxx,dyy)+1e-9, cphi=dxx/d;
+        mag*=P.lamV+(1-P.lamV)*0.5*(1+cphi);
+        const ux=-Math.sign(dxx)*gx/(P.Bxv*P.Bxv), uy=-Math.sign(dyy)*gy/(P.Byv*P.Byv);
+        const un=Math.hypot(ux,uy)+1e-12;
+        fx[i]+=mag*ux/un; fy[i]+=mag*uy/un;
+        // IDM bound (j ahead with lateral overlap)
+        if(dxx>0.1){
+          const m=(i===0?P.evOverlapM:P.overlapM);
+          const latGap=Math.max(Math.abs(dyy)-hW,0);
+          const ov=Math.min(Math.max((m-latGap)/m,0),1);
+          if(ov>0){
+            const gap=Math.max(dxx-hL,0.3), dv=vx[i]-vx[j];
+            const am=(i===0?P.evAmax:P.aMax), b=(i===0?P.evB:P.bComf),
+                  s00=(i===0?P.evS0:P.s0);
+            const sSt=s00+Math.max(vx[i]*this.Thw[i]+vx[i]*dv/(2*Math.sqrt(am*b)),0);
+            const ap=-am*(sSt/gap)*(sSt/gap)*ov;
+            if(ap<idm[i]) idm[i]=ap;}}
+      }
+      const fn=Math.hypot(fx[i],fy[i]);
+      if(fn>P.FcapV){fx[i]*=P.FcapV/fn;fy[i]*=P.FcapV/fn;}
+    }
+    fx[0]*=0.5; fy[0]*=0.5;
+    // EV field + corridor on NPCs
+    const ex=1,ey=0;
+    for(let i=1;i<n;i++){
+      let gx=0,gy=0;
+      if(this.aware[i]===YIELD||this.aware[i]===HOLD){
+        const ddx=x[i]-x[0],ddy=y[i]-y[0];
+        const d=Math.max(Math.hypot(ddx,ddy),0.5);
+        const nx=ddx/d,ny=ddy/d;
+        const wgt=P.lamEv+(1-P.lamEv)*0.5*(1+nx*ex+ny*ey);
+        const mag=Math.min(P.Aev*Math.exp((P.rEv-d)/P.Bev),P.FcapEv)*wgt;
+        gx+=mag*nx; gy+=mag*ny;}
+      const s=x[i]-c.x0, dl=y[i]-c.yC;
+      if(s>-P.Lback&&s<c.L){
+        const wNeed=0.5*(W[0]+W[i])+P.marginC;
+        const over=Math.max(Math.abs(dl)-wNeed,0);
+        const fade=Math.min(Math.max((c.L-s)/P.endRamp,0),1);
+        const gate=u[i]*fade;
+        const sd=this.side[i]!==0?this.side[i]:(dl>=0?1:-1);
+        gy+=P.Ac*Math.exp(-over/P.Bc)*gate*sd;
+        const blocked=Math.min(Math.max((wNeed-Math.abs(dl))/wNeed,0),1);
+        gx+=-P.gammaC*gate*blocked*Math.max(vx[i]-P.kappa*v0[i],0);}
+      fx[i]+=gx; fy[i]+=gy;
+    }
+    // compose accelerations
+    for(let i=0;i<n;i++){
+      const drx=(v0[i]-vx[i])/tau[i], dry=-vy[i]/tau[i];
+      let lat;
+      if(i===0){ // EV: weave spring
+        let yT=c.yC, best=1e9;
+        for(let j=1;j<n;j++){const dxx=x[j]-x[0];
+          if(dxx>0&&dxx<P.weaveLook&&Math.abs(y[j]-c.yC)<0.5*(W[j]+W[0])+P.weaveMargin&&dxx<best){
+            best=dxx; const esc=c.yC>=y[j]?1:-1;
+            yT=y[j]+esc*(0.5*(W[j]+W[0])+P.weaveMargin);
+            yT=Math.min(Math.max(yT,c.yC-P.weaveMax),c.yC+P.weaveMax);}}
+        lat=P.evOm*P.evOm*(yT-y[0])-2*P.evZeta*P.evOm*vy[0];
+      } else {
+        const aPinE=P.aPin*(1-P.pinRelief*u[i]);
+        const inside=y[i]>=0&&y[i]<=this.road.n*this.road.w;
+        lat=inside?-aPinE*Math.sin(2*Math.PI*(y[i]-0.5*this.road.w)/this.road.w):0;
+        const om=Math.sqrt(2*Math.PI*P.aPin/this.road.w);
+        lat+=-Math.max(2*P.zeta*om-1/tau[i],0)*vy[i];
+      }
+      const eLo=(y[i]-0.5*W[i])-this.road.yMin, eHi=this.road.yMax-(y[i]+0.5*W[i]);
+      lat+=P.aWall*(Math.exp(-Math.max(eLo,0)/P.bWall)-Math.exp(-Math.max(eHi,0)/P.bWall));
+      let axx=drx+Math.min(fx[i],idm[i]);
+      let ayy=dry+lat+fy[i];
+      const am=(i===0?P.evAmax:P.aMax*(this.aware[i]===YIELD?P.boost:1));
+      axx=Math.min(Math.max(axx,-P.bEmerg),am);
+      ayy=Math.min(Math.max(ayy,-P.aLatMax),P.aLatMax);
+      this.ax[i]=axx; this.ay[i]=ayy;
+    }
+    // integrate (semi-implicit)
+    for(let i=0;i<n;i++){
+      vx[i]=Math.max(vx[i]+this.ax[i]*P.dt,0);
+      vy[i]=Math.min(Math.max(vy[i]+this.ay[i]*P.dt,-P.vLatMax),P.vLatMax);
+      x[i]+=vx[i]*P.dt; y[i]+=vy[i]*P.dt;
+      const lo=this.road.yMin+0.5*W[i]+0.05, hi=this.road.yMax-0.5*W[i]-0.05;
+      if(y[i]<lo){y[i]=lo;vy[i]=0;} if(y[i]>hi){y[i]=hi;vy[i]=0;}
+    }
+    this.t+=P.dt;
+  }
+  clearance(){const c=this.corr(); let m=250;
+    for(let i=1;i<this.n;i++){
+      const wN=0.5*(this.W[0]+this.W[i])+P.marginC;
+      const dxx=this.x[i]-this.x[0]-0.5*(this.L[0]+this.L[i]);
+      if(dxx>0&&Math.abs(this.y[i]-c.yC)<wN&&dxx<m)m=dxx;}
+    return m;}
+  minTTC(){let m=1e9;
+    for(let i=0;i<this.n;i++)for(let j=0;j<this.n;j++){
+      if(i===j)continue;
+      const dxx=this.x[j]-this.x[i];if(dxx<=0||dxx>80)continue;
+      if(Math.abs(this.y[j]-this.y[i])>=0.5*(this.W[i]+this.W[j])-0.05)continue;
+      const gap=dxx-0.5*(this.L[i]+this.L[j]),dv=this.vx[i]-this.vx[j];
+      if(gap>0&&dv>0.3)m=Math.min(m,gap/dv);}
+    return m;}
+}
+
+/* field probe for overlays (u = 1) */
+function probe(px,py,evx,evy,yC,Lc){
+  let fx2=0,fy2=0;
+  const ddx=px-evx,ddy=py-evy,d=Math.max(Math.hypot(ddx,ddy),0.5);
+  const nx=ddx/d,ny=ddy/d,wgt=P.lamEv+(1-P.lamEv)*0.5*(1+nx);
+  const mag=Math.min(P.Aev*Math.exp((P.rEv-d)/P.Bev),P.FcapEv)*wgt;
+  fx2+=mag*nx;fy2+=mag*ny;
+  const s=px-evx,dl=py-yC;
+  if(s>-P.Lback&&s<Lc){
+    const over=Math.max(Math.abs(dl)-2.5,0);
+    const fade=Math.min(Math.max((Lc-s)/P.endRamp,0),1);
+    fy2+=P.Ac*Math.exp(-over/P.Bc)*fade*Math.sign(dl||1);}
+  return [fx2,fy2];
+}
+
+/* ==================== renderer & loop ==================== */
+const cv=document.getElementById("simcv"),ctx=cv.getContext("2d");
+const DPR=Math.min(window.devicePixelRatio||1,2);
+let sim=null, running=false, showField=false, showVec=false;
+let histV=[], histC=[];
+const opts={scenario:"overtake", den:22, vEv:36, pnc:0.05, yielding:true, seed:1};
+const reduced=matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+function resize(){const w=cv.clientWidth;cv.width=w*DPR;cv.height=300*DPR;}
+window.addEventListener("resize",()=>{resize();draw();});
+
+function newSim(){
+  sim=new Sim(opts.scenario,opts);
+  sim.yielding=opts.yielding;
+  histV=[];histC=[];
+  draw(); tele();
+}
+function world2s(){ // camera follows EV
+  const span=opts.scenario==="jam"?200:260;
+  const scale=cv.width/span;
+  const x0=sim.x[0]-span*0.28;
+  const road=sim.road;
+  const rh=(road.yMax-road.yMin);
+  const yscale=Math.min(scale*1.9, (cv.height-70*DPR)/rh);
+  const yPix=v=> cv.height*0.52+(road.yMin+rh/2-v)*yscale;
+  return {x:v=>(v-x0)*scale, y:yPix, s:scale, ys:yscale, x0, span};
+}
+function rr(x,y,w,h,r){ctx.beginPath();ctx.roundRect(x,y,w,h,r);}
+function draw(){
+  if(!sim)return;
+  const m=world2s(),road=sim.road;
+  ctx.fillStyle="#0c0c0f";ctx.fillRect(0,0,cv.width,cv.height);
+  // road
+  ctx.fillStyle="#1c1c21";
+  ctx.fillRect(0,m.y(road.yMax),cv.width,(road.yMax-road.yMin)*m.ys);
+  ctx.fillStyle="#222228";
+  ctx.fillRect(0,m.y(road.n*road.w),cv.width,road.n*road.w*m.ys);
+  // corridor band
+  const c=sim.corr();
+  const bx=m.x(c.x0),bw=Math.min(m.x(c.x0+c.L)-bx,cv.width-bx);
+  const grd=ctx.createLinearGradient(bx,0,bx+bw,0);
+  grd.addColorStop(0,"rgba(230,103,103,0.20)");grd.addColorStop(1,"rgba(230,103,103,0.02)");
+  ctx.fillStyle=grd;
+  ctx.fillRect(bx,m.y(c.yC+1.8),bw,3.6*m.ys);
+  // field overlay
+  if(showField){
+    const gx=34,gy=12;
+    for(let i2=0;i2<gx;i2++)for(let j2=0;j2<gy;j2++){
+      const wx=m.x0+ (i2+0.5)/gx*m.span, wy=road.yMin+(j2+0.5)/gy*(road.yMax-road.yMin);
+      const f=probe(wx,wy,sim.x[0],sim.y[0],c.yC,c.L);
+      const mag=Math.min(Math.hypot(f[0],f[1])/4.5,1);
+      if(mag<0.03)continue;
+      ctx.fillStyle=`rgba(57,135,229,${0.34*mag})`;
+      ctx.fillRect(m.x(wx)-cv.width/gx/2,m.y(wy)-((road.yMax-road.yMin)*m.ys)/gy/2,
+                   cv.width/gx+1,((road.yMax-road.yMin)*m.ys)/gy+1);}
+  }
+  // lane paint
+  ctx.strokeStyle="rgba(232,230,218,0.55)";ctx.lineWidth=1.2*DPR;
+  ctx.setLineDash([14*DPR,14*DPR]);
+  for(let k=1;k<road.n;k++){ctx.beginPath();ctx.moveTo(0,m.y(k*road.w));ctx.lineTo(cv.width,m.y(k*road.w));ctx.stroke();}
+  ctx.setLineDash([]);
+  ctx.strokeStyle="rgba(232,230,218,0.8)";ctx.lineWidth=1.6*DPR;
+  [0,road.n*road.w].forEach(yb=>{ctx.beginPath();ctx.moveTo(0,m.y(yb));ctx.lineTo(cv.width,m.y(yb));ctx.stroke();});
+  // corridor centreline
+  ctx.strokeStyle="rgba(230,103,103,0.5)";ctx.lineWidth=1*DPR;ctx.setLineDash([6*DPR,7*DPR]);
+  ctx.beginPath();ctx.moveTo(bx,m.y(c.yC));ctx.lineTo(bx+bw,m.y(c.yC));ctx.stroke();ctx.setLineDash([]);
+  // vectors
+  if(showVec){
+    ctx.strokeStyle="rgba(158,197,242,0.8)";ctx.lineWidth=1.1*DPR;
+    for(let i=1;i<sim.n;i++){
+      if(sim.u[i]<=0.02)continue;
+      const f=probe(sim.x[i],sim.y[i],sim.x[0],sim.y[0],c.yC,c.L);
+      const sc=6*DPR;
+      ctx.beginPath();ctx.moveTo(m.x(sim.x[i]),m.y(sim.y[i]));
+      ctx.lineTo(m.x(sim.x[i])+f[0]*sc,m.y(sim.y[i])-f[1]*sc);ctx.stroke();}
+  }
+  // cars
+  for(let i=1;i<sim.n;i++){
+    const px=m.x(sim.x[i]),py=m.y(sim.y[i]);
+    if(px<-30||px>cv.width+30)continue;
+    const w=sim.L[i]*m.s,h=sim.W[i]*m.ys;
+    ctx.fillStyle=ST_COL[sim.aware[i]];
+    rr(px-w/2,py-h/2,w,h,3*DPR);ctx.fill();
+    ctx.fillStyle="rgba(255,255,255,0.25)";
+    ctx.fillRect(px+w*0.26,py-h/2+1,2*DPR,h-2);   // windshield hint
+  }
+  // EV: glow + strobe
+  const px=m.x(sim.x[0]),py=m.y(sim.y[0]);
+  const w=sim.L[0]*m.s,h=sim.W[0]*m.ys;
+  const ph=reduced?0:Math.floor(sim.t*3.4)%2;
+  const glow=ctx.createRadialGradient(px,py,2,px,py,w*1.5);
+  glow.addColorStop(0,ph? "rgba(230,103,103,0.5)":"rgba(158,197,242,0.45)");
+  glow.addColorStop(1,"rgba(0,0,0,0)");
+  ctx.fillStyle=glow;ctx.fillRect(px-w*1.6,py-w*1.6,w*3.2,w*3.2);
+  ctx.fillStyle="#e66767";rr(px-w/2,py-h/2,w,h,3*DPR);ctx.fill();
+  ctx.fillStyle=ph?"#ffffff":"#9ec5f4";
+  ctx.fillRect(px-2.4*DPR,py-h/2+1,4.8*DPR,h-2);
+  // scale bar
+  ctx.strokeStyle="rgba(232,230,218,0.5)";ctx.lineWidth=1*DPR;
+  const sb=50*m.s;
+  ctx.beginPath();ctx.moveTo(cv.width-sb-16*DPR,cv.height-12*DPR);
+  ctx.lineTo(cv.width-16*DPR,cv.height-12*DPR);ctx.stroke();
+  ctx.fillStyle="rgba(185,184,173,0.9)";ctx.font=`${10*DPR}px Cascadia Mono,Consolas,monospace`;
+  ctx.textAlign="right";ctx.fillText("50 m",cv.width-16*DPR,cv.height-17*DPR);
+}
+/* telemetry */
+const $=id=>document.getElementById(id);
+function tele(){
+  if(!sim)return;
+  const clr=sim.clearance();
+  $("t-vev").textContent=(sim.vx[0]*3.6).toFixed(0);
+  $("t-ratio").textContent=(100*sim.vx[0]/sim.v0[0]).toFixed(0);
+  $("t-clr").textContent=clr>=250?"250+":clr.toFixed(0);
+  let ny=0;for(let i=1;i<sim.n;i++)if(sim.aware[i]===YIELD)ny++;
+  $("t-ny").textContent=ny;
+  const ttc=sim.minTTC();
+  sim.minTTCwin.push(ttc);if(sim.minTTCwin.length>100)sim.minTTCwin.shift();
+  const mt=Math.min(...sim.minTTCwin);
+  $("t-ttc").textContent=mt>99?"&mdash;":mt.toFixed(1);
+  if(mt>99)$("t-ttc").innerHTML="&ndash;";
+  $("t-t").textContent=sim.t.toFixed(0);
+  histV.push(sim.vx[0]*3.6);histC.push(Math.min(clr,250));
+  if(histV.length>600){histV.shift();histC.shift();}
+  spark($("sp-v"),histV,"#e66767");spark($("sp-c"),histC,"#3987e5");
+}
+function spark(cnv,data,col){
+  const c2=cnv.getContext("2d");
+  cnv.width=cnv.clientWidth*DPR;cnv.height=64*DPR;
+  c2.clearRect(0,0,cnv.width,cnv.height);
+  if(data.length<2)return;
+  const mx=Math.max(...data,1),mn=0;
+  c2.strokeStyle="rgba(42,42,49,1)";c2.lineWidth=1;
+  c2.beginPath();c2.moveTo(0,cnv.height-1);c2.lineTo(cnv.width,cnv.height-1);c2.stroke();
+  c2.strokeStyle=col;c2.lineWidth=1.8*DPR;c2.beginPath();
+  data.forEach((v,i)=>{const X=i/(600-1)*cnv.width,Y=cnv.height-4-(v-mn)/(mx-mn)*(cnv.height-10);
+    i?c2.lineTo(X,Y):c2.moveTo(X,Y);});
+  c2.stroke();
+  const lv=data[data.length-1];
+  c2.fillStyle=col;c2.beginPath();
+  c2.arc((data.length-1)/599*cnv.width,cnv.height-4-(lv-mn)/(mx-mn)*(cnv.height-10),2.5*DPR,0,7);c2.fill();
+}
+/* main loop */
+let last=0,acc=0;
+function loop(ts){
+  if(running){
+    if(last)acc+=Math.min((ts-last)/1000,0.1)*2.0;  // 2x time-lapse
+    last=ts;
+    let k=0;
+    while(acc>=P.dt&&k<10){sim.step();acc-=P.dt;k++;}
+    // auto-restart when EV leaves populated region
+    const lastCar=Math.max(...sim.x.slice(1));
+    if(sim.x[0]>lastCar+120){opts.seed++;newSim();}
+    draw();tele();
+  } else last=ts;
+  requestAnimationFrame(loop);
+}
+/* ==================== controls ==================== */
+const sliders={Ac:["p-Ac","v-Ac",v=>P.Ac=v,1],Bc:["p-Bc","v-Bc",v=>P.Bc=v,2],
+  Aev:["p-Aev","v-Aev",v=>P.Aev=v,1],Bev:["p-Bev","v-Bev",v=>P.Bev=v,0],
+  Tr:["p-Tr","v-Tr",v=>P.Treact=v,1],
+  nc:["p-nc","v-nc",v=>{opts.pnc=v/100},0],
+  den:["p-den","v-den",v=>{opts.den=v},0],
+  vev:["p-vev","v-vev",v=>{opts.vEv=v/3.6},0]};
+function setSliders(vals){
+  for(const k in vals){const [sid,vid,fn,dec]=sliders[k];
+    $(sid).value=vals[k]; $(vid).textContent=(+vals[k]).toFixed(dec); fn(+vals[k]);}
+}
+for(const k in sliders){const [sid,vid,fn,dec]=sliders[k];
+  $(sid).addEventListener("input",e=>{const v=+e.target.value;
+    $(vid).textContent=v.toFixed(dec);fn(v);
+    if(k==="den"||k==="vev"||k==="nc")newSim();});}
+function applyPreset(which){
+  opts.yielding=true;
+  if(which==="cal") setSliders({Ac:P0.Ac,Bc:P0.Bc,Aev:P0.Aev,Bev:P0.Bev,Tr:P0.Treact,
+    nc:5,den:opts.scenario==="jam"?40:22,vev:opts.scenario==="jam"?32:130});
+  if(which==="off"){opts.yielding=false;}
+  if(which==="sub") setSliders({Ac:0.7,Bc:P0.Bc,Aev:P0.Aev,Bev:P0.Bev,Tr:P0.Treact,
+    nc:5,den:opts.scenario==="jam"?40:22,vev:opts.scenario==="jam"?32:130});
+  newSim();
+}
+$("pre-cal").onclick=()=>applyPreset("cal");
+$("pre-off").onclick=()=>applyPreset("off");
+$("pre-sub").onclick=()=>applyPreset("sub");
+$("sc-ot").onclick=()=>{opts.scenario="overtake";$("sc-ot").classList.add("on");
+  $("sc-jam").classList.remove("on");applyPreset("cal");};
+$("sc-jam").onclick=()=>{opts.scenario="jam";$("sc-jam").classList.add("on");
+  $("sc-ot").classList.remove("on");applyPreset("cal");};
+$("btn-play").onclick=()=>{running=!running;
+  $("btn-play").innerHTML=running?"&#10073;&#10073; pause":"&#9654; run";};
+$("btn-reset").onclick=()=>{opts.seed=1;newSim();};
+$("btn-field").onclick=e=>{showField=!showField;e.target.classList.toggle("on");draw();};
+$("btn-vec").onclick=e=>{showVec=!showVec;e.target.classList.toggle("on");draw();};
+
+/* ==================== tabs ==================== */
+document.querySelectorAll(".tabs button").forEach(b=>{
+  b.onclick=()=>{document.querySelectorAll(".tabs button").forEach(x=>x.classList.remove("on"));
+    b.classList.add("on");
+    document.querySelectorAll(".tabpane").forEach(pn=>pn.style.display="none");
+    $("tab-"+b.dataset.tab).style.display="";
+    drawCharts(b.dataset.tab);};
+});
+
+/* ==================== charts ==================== */
+const tip=$("tip");
+function showTip(e,txt){tip.style.display="block";tip.textContent=txt;
+  tip.style.left=Math.min(e.clientX+14,innerWidth-170)+"px";tip.style.top=(e.clientY+12)+"px";}
+function hideTip(){tip.style.display="none";}
+function setupCv(id,h){const c3=$(id);c3.width=c3.clientWidth*DPR;c3.height=h*DPR;
+  const g=c3.getContext("2d");g.font=`${11*DPR}px Cascadia Mono,Consolas,monospace`;return [c3,g];}
+function axes(g,x0,y0,x1,y1){g.strokeStyle="#383835";g.lineWidth=1*DPR;
+  g.beginPath();g.moveTo(x0,y0);g.lineTo(x0,y1);g.lineTo(x1,y1);g.stroke();}
+
+function drawStats(){
+  const M=DATA.metrics;
+  const up=(a,b)=>((a/b-1)*100).toFixed(0);
+  $("statrow").innerHTML=`
+   <div class="stat"><div class="big up">+${up(M.overtake.ev_mean_speed,M.overtake_base.ev_mean_speed)}%</div>
+     <div class="cap">EV speed, motorway (${(M.overtake_base.ev_mean_speed*3.6).toFixed(0)} &rarr; ${(M.overtake.ev_mean_speed*3.6).toFixed(0)} km/h = ${(100*M.overtake.ev_speed_ratio).toFixed(0)}% of desired)</div></div>
+   <div class="stat"><div class="big up">+${up(M.jam.ev_mean_speed,M.jam_base.ev_mean_speed)}%</div>
+     <div class="cap">EV speed in jam (${(M.jam_base.ev_mean_speed*3.6).toFixed(0)} &rarr; ${(M.jam.ev_mean_speed*3.6).toFixed(0)} km/h); rescue lane opens in ${M.jam.t_clear.toFixed(0)} s</div></div>
+   <div class="stat"><div class="big">${M.overtake.react_dist_mean.toFixed(0)} m</div>
+     <div class="cap">mean yield-onset distance ahead of the EV (empirical band 50&ndash;150 m)</div></div>
+   <div class="stat"><div class="big">${M.overtake.collisions+M.jam.collisions}</div>
+     <div class="cap">collisions across both calibrated runs; min TTC ${M.jam.min_ttc.toFixed(1)} s (jam), ${M.overtake.min_ttc.toFixed(1)} s (motorway)</div></div>`;
+}
+function chTraces(){
+  const [c3,g]=setupCv("ch-traces",300);
+  const L2={l:46*DPR,r:12*DPR,t:14*DPR,b:30*DPR};
+  const w=c3.width-L2.l-L2.r,h=c3.height-L2.t-L2.b;
+  const tmax=80,vmax=140;
+  const X=t=>L2.l+t/tmax*w, Y=v=>L2.t+h-(v/vmax)*h;
+  g.clearRect(0,0,c3.width,c3.height);
+  for(let v=0;v<=vmax;v+=35){g.strokeStyle="#26262b";g.beginPath();g.moveTo(L2.l,Y(v));g.lineTo(L2.l+w,Y(v));g.stroke();
+    g.fillStyle="#7d7c74";g.textAlign="right";g.fillText(v,L2.l-6*DPR,Y(v)+4*DPR);}
+  for(let t=0;t<=tmax;t+=20){g.fillStyle="#7d7c74";g.textAlign="center";g.fillText(t,X(t),c3.height-10*DPR);}
+  axes(g,L2.l,L2.t,L2.l,L2.t+h);
+  const series=[["overtake","#3987e5",0,"motorway - model"],["overtake_base","#3987e5",1,"no yielding"],
+                ["jam","#d95926",0,"jam - model"],["jam_base","#d95926",1,"no yielding"]];
+  series.forEach(([k,col,dash])=>{
+    const tr=DATA.traces[k];g.strokeStyle=col;g.lineWidth=2*DPR;
+    g.setLineDash(dash?[5*DPR,5*DPR]:[]);g.globalAlpha=dash?0.75:1;
+    g.beginPath();tr.t.forEach((t,i)=>{i?g.lineTo(X(t),Y(tr.v[i]*3.6)):g.moveTo(X(t),Y(tr.v[i]*3.6));});
+    g.stroke();g.setLineDash([]);g.globalAlpha=1;});
+  g.textAlign="left";
+  g.fillStyle="#3987e5";g.fillText("motorway 129 km/h",X(30),Y(136));
+  g.fillStyle="#3987e5";g.globalAlpha=0.8;g.fillText("no yielding 102",X(43),Y(84));g.globalAlpha=1;
+  g.fillStyle="#d95926";g.fillText("jam 31 km/h",X(48),Y(41));
+  g.globalAlpha=0.8;g.fillText("no yielding 9",X(30),Y(15));g.globalAlpha=1;
+  g.fillStyle="#7d7c74";g.save();g.translate(12*DPR,L2.t+h/2);g.rotate(-Math.PI/2);
+  g.textAlign="center";g.fillText("EV speed (km/h)",0,0);g.restore();
+  g.textAlign="center";g.fillText("time (s)",L2.l+w/2,c3.height-1);
+}
+function chReact(){
+  const [c3,g]=setupCv("ch-react",250);
+  const L2={l:46*DPR,r:12*DPR,t:12*DPR,b:32*DPR};
+  const w=c3.width-L2.l-L2.r,h=c3.height-L2.t-L2.b;
+  const bins=new Array(13).fill(0);
+  DATA.react.forEach(r=>{const b=Math.min(Math.floor(r/12),12);bins[b]++;});
+  const bmax=Math.max(...bins);
+  const X=d=>L2.l+d/156*w, Y=n2=>L2.t+h-n2/bmax*(h-8*DPR);
+  g.clearRect(0,0,c3.width,c3.height);
+  g.fillStyle="rgba(25,158,112,0.13)";g.fillRect(X(50),L2.t,X(150)-X(50),h);
+  g.fillStyle="#199e70";g.textAlign="left";g.fillText("empirical band",X(52),L2.t+12*DPR);
+  bins.forEach((n2,b)=>{if(!n2)return;
+    g.fillStyle="#3987e5";
+    const x=X(b*12)+1.5*DPR,bw=X(12)-X(0)-3*DPR;
+    g.beginPath();g.roundRect(x,Y(n2),bw,L2.t+h-Y(n2),[3*DPR,3*DPR,0,0]);g.fill();});
+  axes(g,L2.l,L2.t,L2.l,L2.t+h);
+  g.strokeStyle="#383835";g.beginPath();g.moveTo(L2.l,L2.t+h);g.lineTo(L2.l+w,L2.t+h);g.stroke();
+  const mean=DATA.react.reduce((a,b)=>a+b,0)/DATA.react.length;
+  g.strokeStyle="#e66767";g.lineWidth=1.6*DPR;g.beginPath();g.moveTo(X(mean),L2.t);g.lineTo(X(mean),L2.t+h);g.stroke();
+  g.fillStyle="#e66767";g.fillText(`mean ${mean.toFixed(0)} m`,X(mean)+5*DPR,L2.t+24*DPR);
+  for(let d=0;d<=150;d+=50){g.fillStyle="#7d7c74";g.textAlign="center";g.fillText(d,X(d),c3.height-12*DPR);}
+  g.fillText("distance ahead of EV at yield onset (m)",L2.l+w/2,c3.height-1);
+  g.save();g.translate(12*DPR,L2.t+h/2);g.rotate(-Math.PI/2);g.fillText("drivers",0,0);g.restore();
+}
+function lerpHex(a,b,t){const pa=parseInt(a.slice(1),16),pb=parseInt(b.slice(1),16);
+  const r=(pa>>16)+(((pb>>16)-(pa>>16))*t),g2=((pa>>8)&255)+((((pb>>8)&255)-((pa>>8)&255))*t),
+        b2=(pa&255)+(((pb&255)-(pa&255))*t);
+  return `rgb(${r|0},${g2|0},${b2|0})`;}
+function seqColor(t){ // 0..1 over light->dark blue
+  const stops=["#cde2fb","#86b6ef","#3987e5","#1c5cab","#0d366b"];
+  const s=Math.min(Math.max(t,0),1)*(stops.length-1);
+  const i=Math.min(Math.floor(s),stops.length-2);
+  return lerpHex(stops[i],stops[i+1],s-i);}
+let phaseCells=[];
+function chPhase(){
+  const [c3,g]=setupCv("ch-phase",360);
+  const L2={l:52*DPR,r:86*DPR,t:14*DPR,b:40*DPR};
+  const w=c3.width-L2.l-L2.r,h=c3.height-L2.t-L2.b;
+  const {d,ac,r}=DATA.phase;
+  const vmin=0.7,vmax=1.0;
+  g.clearRect(0,0,c3.width,c3.height);
+  phaseCells=[];
+  const cw=w/d.length,chh=h/ac.length;
+  for(let i=0;i<ac.length;i++)for(let j=0;j<d.length;j++){
+    const val=r[i][j];
+    const x=L2.l+j*cw, y=L2.t+h-(i+1)*chh;
+    g.fillStyle=seqColor((val-vmin)/(vmax-vmin));
+    g.fillRect(x+1,y+1,cw-2,chh-2);
+    phaseCells.push({x,y,w:cw,h:chh,d:d[j],ac:ac[i],v:val});}
+  // threshold lines mapped by row centres (ac is nonlinear -> interpolate index)
+  function acToY(a){let i=0;while(i<ac.length-1&&ac[i+1]<a)i++;
+    const f=(a-ac[i])/(ac[i+1]-ac[i]);
+    return L2.t+h-((i+f+0.5))*chh;}
+  [[1.4,"A_c = a_pin (depinning)",false],[0.7,"with urgency relief",true]].forEach(([v,lab,dash])=>{
+    g.strokeStyle="#ffb0e6";g.lineWidth=1.5*DPR;g.setLineDash(dash?[5*DPR,5*DPR]:[]);
+    g.beginPath();g.moveTo(L2.l,acToY(v));g.lineTo(L2.l+w,acToY(v));g.stroke();g.setLineDash([]);
+    g.fillStyle="#ffb0e6";g.textAlign="left";g.fillText(lab,L2.l+6*DPR,acToY(v)-5*DPR);});
+  // axis labels
+  g.fillStyle="#7d7c74";g.textAlign="center";
+  d.forEach((dv,j)=>g.fillText(dv,L2.l+(j+0.5)*cw,L2.t+h+16*DPR));
+  g.fillText("traffic density (veh/km/lane)",L2.l+w/2,c3.height-6*DPR);
+  g.textAlign="right";
+  ac.forEach((av,i)=>g.fillText(av,L2.l-6*DPR,L2.t+h-(i+0.5)*chh+4*DPR));
+  g.save();g.translate(12*DPR,L2.t+h/2);g.rotate(-Math.PI/2);g.textAlign="center";
+  g.fillText("corridor strength A_c (m/s^2)",0,0);g.restore();
+  // colorbar
+  const cbx=c3.width-64*DPR;
+  for(let k=0;k<=60;k++){g.fillStyle=seqColor(k/60);
+    g.fillRect(cbx,L2.t+h-(k/60)*h,14*DPR,h/60+1);}
+  g.fillStyle="#7d7c74";g.textAlign="left";
+  [[0,"0.70"],[0.5,"0.85"],[1,"1.00"]].forEach(([f,lab])=>
+    g.fillText(lab,cbx+18*DPR,L2.t+h-f*h+4*DPR));
+  g.fillText("v/v0",cbx,L2.t-2*DPR);
+  // table view
+  const tbl=$("tbl-phase");
+  if(!tbl.rows.length){
+    let html="<tr><th>A_c \\ density</th>"+d.map(x=>`<th>${x}</th>`).join("")+"</tr>";
+    for(let i=ac.length-1;i>=0;i--)
+      html+=`<tr><td class="num">${ac[i]}</td>`+r[i].map(v=>`<td class="num">${v.toFixed(2)}</td>`).join("")+"</tr>";
+    tbl.innerHTML=html;}
+  c3.onmousemove=e=>{const rct=c3.getBoundingClientRect();
+    const mx=(e.clientX-rct.left)*DPR,my=(e.clientY-rct.top)*DPR;
+    const cell=phaseCells.find(q=>mx>=q.x&&mx<q.x+q.w&&my>=q.y&&my<q.y+q.h);
+    cell?showTip(e,`density ${cell.d} veh/km/lane\nA_c ${cell.ac} m/s2\nEV speed ratio ${cell.v.toFixed(3)}`):hideTip();};
+  c3.onmouseleave=hideTip;
+}
+function chField(){
+  const [c3,g]=setupCv("ch-field",300);
+  const w=c3.width,h=c3.height;
+  g.clearRect(0,0,w,h);
+  const x0=-60,x1=160,yA=-2,yB=12.3;
+  const X=v=>(v-x0)/(x1-x0)*w, Y=v=>h-(v-yA)/(yB-yA)*h;
+  const evx=0,evy=5.25;
+  const Pc={...P};   // snapshot sliders
+  for(let i=0;i<110;i++)for(let j=0;j<44;j++){
+    const wx=x0+(i+0.5)/110*(x1-x0),wy=yA+(j+0.5)/44*(yB-yA);
+    const f=probe(wx,wy,evx,evy,evy,220);
+    const mag=Math.min(Math.hypot(f[0],f[1])/4.5,1);
+    g.fillStyle=seqColor(mag*0.97);
+    g.fillRect(X(wx),Y(wy)-h/44,w/110+1,h/44+1);}
+  [0,3.5,7,10.5].forEach((yb,i)=>{g.strokeStyle="rgba(232,230,218,0.6)";
+    g.lineWidth=(i===0||i===3?1.6:1)*DPR;g.setLineDash(i===0||i===3?[]:[8*DPR,8*DPR]);
+    g.beginPath();g.moveTo(0,Y(yb));g.lineTo(w,Y(yb));g.stroke();g.setLineDash([]);});
+  g.strokeStyle="rgba(240,240,240,0.75)";g.lineWidth=1*DPR;
+  for(let i=0;i<26;i++)for(let j=0;j<9;j++){
+    const wx=x0+(i+0.5)/26*(x1-x0),wy=yA+(j+0.5)/9*(yB-yA);
+    const f=probe(wx,wy,evx,evy,evy,220);
+    const mg=Math.hypot(f[0],f[1]);if(mg<0.12)continue;
+    const sc=Math.min(mg,3)/mg*9*DPR;
+    g.beginPath();g.moveTo(X(wx),Y(wy));g.lineTo(X(wx)+f[0]*sc,Y(wy)-f[1]*sc);g.stroke();
+    g.beginPath();g.arc(X(wx),Y(wy),1.1*DPR,0,7);g.fill();}
+  g.fillStyle="#e66767";
+  g.beginPath();g.moveTo(X(3),Y(evy));g.lineTo(X(-3),Y(evy+1));g.lineTo(X(-3),Y(evy-1));g.closePath();g.fill();
+  g.fillStyle="#f2f2ee";g.textAlign="left";
+  g.fillText("EV ->",X(-14),Y(evy)+4*DPR);
+  g.fillStyle="rgba(230,103,103,0.9)";g.fillText("predicted corridor",X(60),Y(evy)-6*DPR);
+}
+function chSumo(){
+  const [c3,g]=setupCv("ch-sumo",270);
+  g.clearRect(0,0,c3.width,c3.height);
+  const S=DATA.sumo;
+  if(!S){g.fillStyle="#7d7c74";g.textAlign="center";
+    g.fillText("run experiments/run_sumo_compare.py to populate",c3.width/2,c3.height/2);
+    return;}
+  const L2={l:52*DPR,r:16*DPR,t:20*DPR,b:44*DPR};
+  const w=c3.width-L2.l-L2.r,h=c3.height-L2.t-L2.b;
+  const modes=[["none","no yielding","#5d5c58"],["bluelight","SUMO bluelight","#c98500"],["force","force bridge","#3987e5"]];
+  const vmax=Math.max(...modes.map(m=>S[m[0]].seg_speed*3.6))*1.18;
+  modes.forEach((m,i)=>{
+    const v=S[m[0]].seg_speed*3.6;
+    const bw=w/modes.length*0.56, x=L2.l+w*(i+0.5)/modes.length-bw/2;
+    g.fillStyle=m[2];
+    g.beginPath();g.roundRect(x,L2.t+h-(v/vmax)*h,bw,(v/vmax)*h,[4*DPR,4*DPR,0,0]);g.fill();
+    g.fillStyle="#f2f2ee";g.textAlign="center";
+    g.fillText(v.toFixed(0)+" km/h",x+bw/2,L2.t+h-(v/vmax)*h-6*DPR);
+    g.fillStyle="#b9b8ad";g.fillText(m[1],x+bw/2,L2.t+h+16*DPR);
+    g.fillStyle="#7d7c74";
+    g.fillText(`${S[m[0]].seg_time.toFixed(0)} s | clr ${S[m[0]].clearance_mean.toFixed(0)} m | col ${S[m[0]].collisions}`,
+               x+bw/2,L2.t+h+32*DPR);});
+  g.strokeStyle="#383835";g.beginPath();g.moveTo(L2.l,L2.t+h);g.lineTo(L2.l+w,L2.t+h);g.stroke();
+  g.save();g.translate(12*DPR,L2.t+h/2);g.rotate(-Math.PI/2);g.textAlign="center";
+  g.fillStyle="#7d7c74";g.fillText("EV mean speed, 2.2 km segment",0,0);g.restore();
+  $("sumo-cap").textContent="EV progress through the same seeded SUMO traffic (1700 veh/h/lane, 3 lanes, "+
+    "sublane resolution 0.4 m). Labels: segment time | mean corridor clearance | collision count.";
+}
+function drawParamTable(){
+  const rows=[["A_ev","EV point-field strength","m/s2",2.152,"1.5 - 8"],
+    ["B_ev","EV field decay length","m",21.41,"8 - 40"],
+    ["A_c","corridor strength","m/s2",3.758,"1.5 - 8"],
+    ["B_c","corridor decay length","m",0.748,"0.6 - 3"],
+    ["T_react","anticipation horizon","s",15.94,"4 - 16"],
+    ["gamma_c","yield-brake gain","1/s",0.72,"0.05 - 1.2"],
+    ["lambda","EV-field anisotropy","-",0.10,"fixed"],
+    ["a_pin","lane-pinning strength","m/s2",1.4,"fixed"],
+    ["T_pred","path prediction horizon","s",8.0,"fixed"]];
+  $("tbl-params").innerHTML="<tr><th>parameter</th><th>meaning</th><th>unit</th><th>calibrated</th><th>bounds</th></tr>"+
+    rows.map(r=>`<tr><td class="num">${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td><td class="num">${r[3]}</td><td class="num">${r[4]}</td></tr>`).join("");
+}
+const drawn={};
+function drawCharts(tab){
+  if(drawn[tab])return;drawn[tab]=true;
+  if(tab==="results"){drawStats();chTraces();chReact();}
+  if(tab==="phase")chPhase();
+  if(tab==="physics"){chField();drawParamTable();}
+  if(tab==="sumo")chSumo();
+}
+window.addEventListener("resize",()=>{Object.keys(drawn).forEach(k=>{drawn[k]=false;});
+  const on=document.querySelector(".tabs button.on");if(on)drawCharts(on.dataset.tab);
+  Object.keys(drawn).forEach(k=>{if(k!==(on&&on.dataset.tab))drawn[k]=false;});});
+
+/* ==================== boot ==================== */
+resize();
+setSliders({Ac:P0.Ac,Bc:P0.Bc,Aev:P0.Aev,Bev:P0.Bev,Tr:P0.Treact,nc:5,den:22,vev:130});
+newSim();
+drawCharts("results");
+if(!reduced){running=true;$("btn-play").innerHTML="&#10073;&#10073; pause";}
+requestAnimationFrame(loop);
+</script>

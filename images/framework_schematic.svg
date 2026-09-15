@@ -1,0 +1,547 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1420" viewBox="0 0 1600 1420"
+     font-family="Inter, 'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif">
+  <title>physics_behaviour_EMV — framework schematic</title>
+  <desc>Architecture of the physics-informed social-force framework for emergency-vehicle yielding:
+    inputs, the per-step simulation core, measurement and analysis, two-stage identification,
+    couplings to SUMO and Unreal Engine, and the reproducibility layer.</desc>
+
+  <defs>
+    <style>
+      .h1   { font-size: 30px; font-weight: 700; fill: #0b0b0b; letter-spacing: -0.3px; }
+      .sub  { font-size: 15px; fill: #52514e; }
+      .sec  { font-size: 13px; font-weight: 700; fill: #52514e; letter-spacing: 1.4px; }
+      .sec b, .secn { fill: #0b0b0b; }
+      .ct   { font-size: 14.5px; font-weight: 700; fill: #0b0b0b; }
+      .mono { font-family: 'JetBrains Mono', Consolas, 'DejaVu Sans Mono', Menlo, monospace; }
+      .file { font-size: 11.5px; fill: #52514e; }
+      .sans { font-family: Inter, 'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif; }
+      .tx   { font-size: 12.5px; fill: #0b0b0b; }
+      .t2   { font-size: 12px; fill: #52514e; }
+      .sm   { font-size: 11px; fill: #52514e; }
+      .xs   { font-size: 10px; fill: #898781; }
+      .eq   { font-family: 'STIX Two Math', 'Cambria Math', 'Times New Roman', serif; font-size: 14px; fill: #0b0b0b; }
+      .eqs  { font-family: 'STIX Two Math', 'Cambria Math', 'Times New Roman', serif; font-size: 13px; fill: #0b0b0b; }
+      .card { fill: #fcfcfb; stroke: #c3c2b7; stroke-width: 1; }
+      .zone { fill: #f2f1ec; stroke: none; }
+      .flow { stroke: #52514e; stroke-width: 1.6; fill: none; }
+      .flowb{ stroke: #2a78d6; stroke-width: 1.8; fill: none; }
+      .flowg{ stroke: #1baf7a; stroke-width: 1.8; fill: none; }
+      .flowv{ stroke: #4a3aa7; stroke-width: 1.8; fill: none; }
+      .lab  { font-size: 11px; fill: #52514e; font-style: italic; }
+    </style>
+
+    <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#52514e"/>
+    </marker>
+    <marker id="arB" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2a78d6"/>
+    </marker>
+    <marker id="arG" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#1baf7a"/>
+    </marker>
+    <marker id="arV" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4a3aa7"/>
+    </marker>
+    <marker id="arO" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#eb6834"/>
+    </marker>
+    <marker id="dim" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#898781"/>
+    </marker>
+
+    <linearGradient id="corrFade" x1="0" x2="1" y1="0" y2="0">
+      <stop offset="0" stop-color="#e34948" stop-opacity="0.20"/>
+      <stop offset="0.85" stop-color="#e34948" stop-opacity="0.16"/>
+      <stop offset="1" stop-color="#e34948" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="shadow" x="-5%" y="-5%" width="110%" height="115%">
+      <feDropShadow dx="0" dy="1" stdDeviation="1.2" flood-color="#0b0b0b" flood-opacity="0.08"/>
+    </filter>
+  </defs>
+
+  <!-- ============================== PAGE ============================== -->
+  <rect width="1600" height="1420" fill="#f9f9f7"/>
+
+  <!-- Header -->
+  <text x="40" y="58" class="h1">physics_behaviour_EMV<tspan dx="12" style="font-weight:400; fill:#52514e">—</tspan><tspan dx="12" style="font-weight:400; fill:#52514e">how traffic yields to an emergency vehicle (EV)</tspan></text>
+  <text x="40" y="88" class="sub">A physics-informed social-force framework: every car is a Newtonian particle under superimposed forces, a perception model</text>
+  <text x="40" y="108" class="sub">decides <tspan font-weight="700" fill="#0b0b0b">when</tspan> each driver feels the EV, calibration against real trajectories sets <tspan font-weight="700" fill="#0b0b0b">how strongly</tspan>, and bridges put it in SUMO and Unreal Engine.</text>
+
+  <!-- colour key -->
+  <g transform="translate(1180,40)">
+    <rect x="0" y="0" width="380" height="64" rx="8" fill="#fcfcfb" stroke="#e1e0d9"/>
+    <text x="14" y="20" class="xs" style="font-weight:700; letter-spacing:1px">COLOUR KEY</text>
+    <rect x="14" y="30" width="12" height="12" rx="2" fill="#2a78d6"/><text x="32" y="40" class="sm">data · ordinary traffic</text>
+    <rect x="160" y="30" width="12" height="12" rx="2" fill="#e34948"/><text x="178" y="40" class="sm">emergency vehicle</text>
+    <rect x="290" y="30" width="12" height="12" rx="2" fill="#eda100"/><text x="308" y="40" class="sm">perception</text>
+    <rect x="14" y="48" width="12" height="12" rx="2" fill="#1baf7a"/><text x="32" y="58" class="sm">identification / fitting</text>
+    <rect x="160" y="48" width="12" height="12" rx="2" fill="#4a3aa7"/><text x="178" y="58" class="sm">couplings · tools</text>
+  </g>
+
+  <!-- ==================== ① INPUTS (col 1) ==================== -->
+  <text x="40" y="160" class="sec"><tspan class="secn">①</tspan> INPUTS</text>
+
+  <!-- Params -->
+  <g filter="url(#shadow)">
+    <rect x="40" y="175" width="300" height="200" rx="10" class="card"/>
+  </g>
+  <rect x="40" y="175" width="5" height="200" rx="2" fill="#52514e"/>
+  <text x="58" y="200" class="ct">Parameters</text>
+  <text x="58" y="218" class="file mono">emv/params.py · Params</text>
+  <text x="58" y="240" class="t2">every constant with unit + literature anchor</text>
+  <g class="mono" font-size="11.5">
+    <rect x="58" y="252" width="266" height="24" rx="5" fill="#f2f1ec"/>
+    <text x="68" y="268" fill="#0b0b0b">Params()</text><text x="200" y="268" class="sm sans">hand-set defaults</text>
+    <rect x="58" y="280" width="266" height="24" rx="5" fill="#f2f1ec"/>
+    <text x="68" y="296" fill="#0b0b0b">TUNED</text><text x="200" y="296" class="sm sans">first behavioural fit</text>
+    <rect x="58" y="308" width="266" height="24" rx="5" fill="#e3eefb"/>
+    <text x="68" y="324" fill="#0b0b0b">TUNED_NORMAL</text><text x="200" y="324" class="sm sans">stage 1 · 19 params</text>
+    <rect x="58" y="336" width="266" height="24" rx="5" fill="#fbe4e3"/>
+    <text x="68" y="352" fill="#0b0b0b">TUNED_BLUELIGHT</text><text x="200" y="352" class="sm sans">+ A_ev B_ev A_c B_c</text>
+  </g>
+
+  <!-- Scenarios -->
+  <g filter="url(#shadow)">
+    <rect x="40" y="390" width="300" height="180" rx="10" class="card"/>
+  </g>
+  <rect x="40" y="390" width="5" height="180" rx="2" fill="#52514e"/>
+  <text x="58" y="415" class="ct">Scenarios</text>
+  <text x="58" y="433" class="file mono">scenarios.py · road.py · state.py</text>
+  <g font-size="12">
+    <text x="58" y="458" class="mono" fill="#0b0b0b">make_overtake</text><text x="176" y="458" class="t2">motorway, EV overtakes</text>
+    <text x="58" y="480" class="mono" fill="#0b0b0b">make_jam</text><text x="176" y="480" class="t2">rescue lane in a jam</text>
+    <text x="58" y="502" class="mono" fill="#0b0b0b">make_highd_like</text><text x="176" y="502" class="t2">measured lanes, speeds,</text>
+    <text x="176" y="517" class="t2">truck share, density</text>
+    <text x="58" y="539" class="mono" fill="#0b0b0b">make_sumo_like</text><text x="176" y="539" class="t2">1:1 mirror of SUMO net</text>
+    <text x="58" y="558" class="sm">+ baselines with the EV inert (no yielding)</text>
+  </g>
+
+  <!-- Data -->
+  <g filter="url(#shadow)">
+    <rect x="40" y="585" width="300" height="240" rx="10" class="card"/>
+  </g>
+  <rect x="40" y="585" width="5" height="240" rx="2" fill="#2a78d6"/>
+  <text x="58" y="610" class="ct">Empirical data</text>
+  <text x="58" y="636" class="tx" font-weight="600">highD drone trajectories</text>
+  <text x="58" y="652" class="file mono">emv/highd.py (streams the zip)</text>
+  <text x="58" y="670" class="t2">60 recordings · 25 Hz · 110,516 vehicles</text>
+  <text x="58" y="686" class="t2">44,476 veh-km · free-flow / dense / congested</text>
+  <text x="58" y="712" class="tx" font-weight="600">Dashcam ground truth (EV view)</text>
+  <text x="58" y="728" class="file mono" font-size="11.5">emv/groundtruth.py</text>
+  <text x="58" y="746" class="t2">kinematic annotator → behaviour</text>
+  <text x="58" y="762" class="t2">fingerprint (yield / brake / fail, onset …)</text>
+  <line x1="58" y1="776" x2="322" y2="776" stroke="#e1e0d9"/>
+  <text x="58" y="796" class="file mono" font-size="11.5">emv/empirical.py</text>
+  <text x="58" y="813" class="t2">cited literature vs measured constants</text>
+
+  <!-- ==================== ② SIMULATION CORE (col 2) ==================== -->
+  <text x="380" y="160" class="sec"><tspan class="secn">②</tspan> SIMULATION CORE  ·  <tspan class="mono" style="letter-spacing:0; font-weight:400">emv/simulate.py  Sim.step()</tspan>  ·  ONE STEP EVERY Δt = 0.05 s</text>
+  <rect x="380" y="175" width="840" height="650" rx="12" class="zone"/>
+
+  <!-- road scene -->
+  <g>
+    <rect x="396" y="190" width="808" height="206" rx="8" fill="#fcfcfb" stroke="#e1e0d9"/>
+    <!-- predicted-corridor dimension -->
+    <line x1="520" y1="212" x2="1000" y2="212" stroke="#e34948" stroke-width="1" marker-start="url(#dim)" marker-end="url(#dim)"/>
+    <text x="760" y="206" text-anchor="middle" class="sm" fill="#e34948" style="fill:#c23a39">predicted corridor  L<tspan baseline-shift="sub" font-size="8">pred</tspan> = clip(max(v<tspan baseline-shift="sub" font-size="8">EV</tspan>, 0.6 v⁰<tspan baseline-shift="sub" font-size="8">EV</tspan>) · 8 s, 120, 260) m</text>
+
+    <!-- road surface -->
+    <rect x="410" y="222" width="690" height="140" fill="#ecebe6"/>
+    <line x1="410" y1="226" x2="1100" y2="226" stroke="#898781" stroke-width="1.5"/>
+    <line x1="410" y1="358" x2="1100" y2="358" stroke="#898781" stroke-width="1.5"/>
+    <line x1="410" y1="270" x2="1100" y2="270" stroke="#fcfcfb" stroke-width="2" stroke-dasharray="14 10"/>
+    <line x1="410" y1="314" x2="1100" y2="314" stroke="#fcfcfb" stroke-width="2" stroke-dasharray="14 10"/>
+    <text x="1094" y="252" text-anchor="end" class="xs">lane 2</text>
+    <text x="1094" y="296" text-anchor="end" class="xs">lane 1</text>
+    <text x="1094" y="340" text-anchor="end" class="xs">lane 0 (right)</text>
+
+    <!-- corridor band -->
+    <rect x="520" y="272" width="480" height="40" fill="url(#corrFade)"/>
+    <line x1="520" y1="292" x2="1000" y2="292" stroke="#e34948" stroke-width="1" stroke-dasharray="4 4" opacity="0.7"/>
+
+    <!-- HOLD car behind EV, merging back -->
+    <rect x="428" y="330" width="34" height="16" rx="4" fill="#1baf7a"/>
+    <!-- other traffic -->
+    <rect x="455" y="240" width="34" height="16" rx="4" fill="#1baf7a"/>
+    <!-- EV -->
+    <rect x="484" y="283" width="40" height="18" rx="4" fill="#e34948"/>
+    <rect x="496" y="286" width="8" height="4" rx="1" fill="#2a78d6"/>
+    <rect x="496" y="294" width="8" height="4" rx="1" fill="#fcfcfb"/>
+    <text x="504" y="318" text-anchor="middle" class="sm" style="font-weight:700; fill:#c23a39">EV</text>
+
+    <!-- YIELDING cars pushed out of the corridor (both sides, sigma) -->
+    <rect x="600" y="297" width="34" height="16" rx="4" fill="#eb6834"/>
+    <line x1="617" y1="314" x2="617" y2="336" stroke="#eb6834" stroke-width="2" marker-end="url(#arO)"/>
+    <rect x="700" y="266" width="34" height="16" rx="4" fill="#eb6834"/>
+    <line x1="717" y1="265" x2="717" y2="243" stroke="#eb6834" stroke-width="2" marker-end="url(#arO)"/>
+    <text x="740" y="248" class="xs">σ = escape side, chosen once</text>
+    <!-- nudged adjacent car -->
+    <rect x="640" y="330" width="34" height="16" rx="4" fill="#eb6834" opacity="0.75"/>
+    <!-- NOTICED: reaction delay pending -->
+    <rect x="820" y="284" width="34" height="16" rx="4" fill="#eda100"/>
+    <text x="837" y="279" text-anchor="middle" class="xs">delay…</text>
+    <!-- UNAWARE, beyond detection -->
+    <rect x="960" y="284" width="34" height="16" rx="4" fill="#898781"/>
+    <rect x="900" y="240" width="34" height="16" rx="4" fill="#898781"/>
+    <rect x="985" y="330" width="34" height="16" rx="4" fill="#898781"/>
+    <rect x="780" y="330" width="34" height="16" rx="4" fill="#eda100"/>
+
+    <!-- lateral force annotation -->
+    <text x="560" y="355" class="xs" style="fill:#c23a39">F⊥ pushes out of corridor</text>
+
+    <!-- perception radii -->
+    <line x1="504" y1="378" x2="904" y2="378" stroke="#898781" stroke-width="1" marker-end="url(#dim)"/>
+    <line x1="504" y1="378" x2="420" y2="378" stroke="#898781" stroke-width="1" marker-end="url(#dim)"/>
+    <line x1="504" y1="370" x2="504" y2="386" stroke="#898781"/>
+    <text x="704" y="391" text-anchor="middle" class="xs">detection ahead  R_front = 140 m</text>
+    <text x="462" y="391" text-anchor="middle" class="xs">R_rear 60 m</text>
+
+    <!-- washboard inset -->
+    <text x="1152" y="214" text-anchor="middle" class="xs" style="font-weight:700">U(y)</text>
+    <line x1="1118" y1="226" x2="1118" y2="358" stroke="#c3c2b7"/>
+    <path d="M 1185 226 Q 1125 248 1185 270 Q 1125 292 1185 314 Q 1125 336 1185 358"
+          fill="none" stroke="#2a78d6" stroke-width="2"/>
+    <circle cx="1155" cy="248" r="3.5" fill="#2a78d6"/>
+    <circle cx="1155" cy="292" r="3.5" fill="#2a78d6"/>
+    <circle cx="1155" cy="336" r="3.5" fill="#2a78d6"/>
+    <text x="1152" y="376" text-anchor="middle" class="xs">washboard:</text>
+    <text x="1152" y="388" text-anchor="middle" class="xs">wells = lanes</text>
+
+  </g>
+
+  <!-- state legend row -->
+  <g transform="translate(396,404)">
+    <rect x="0" y="0" width="12" height="10" rx="2" fill="#898781"/><text x="17" y="9" class="sm">UNAWARE</text>
+    <rect x="84" y="0" width="12" height="10" rx="2" fill="#eda100"/><text x="101" y="9" class="sm">NOTICED</text>
+    <rect x="166" y="0" width="12" height="10" rx="2" fill="#eb6834"/><text x="183" y="9" class="sm">YIELDING</text>
+    <rect x="254" y="0" width="12" height="10" rx="2" fill="#1baf7a"/><text x="271" y="9" class="sm">HOLD / merge back</text>
+    <text x="400" y="9" class="sm">→ a “bow wave”: onset ≈ 100 m ahead, widest clearance d* at the EV</text>
+  </g>
+
+  <!-- step row -->
+  <!-- 1 road -->
+  <g filter="url(#shadow)"><rect x="396" y="428" width="236" height="118" rx="10" class="card"/></g>
+  <circle cx="416" cy="448" r="11" fill="#0b0b0b"/><text x="416" y="452.5" text-anchor="middle" font-size="12" font-weight="700" fill="#fcfcfb">1</text>
+  <text x="434" y="453" class="ct">Corridor projection</text>
+  <text x="412" y="472" class="file mono" font-size="11.5">road.py</text>
+  <text x="412" y="492" class="t2">project the EV route ahead;</text>
+  <text x="412" y="508" class="t2">give every car arc-length s and</text>
+  <text x="412" y="524" class="t2">signed offset d⊥ to the path</text>
+  <text x="412" y="539" class="xs">(curved roads: polyline projection)</text>
+
+  <line x1="634" y1="487" x2="650" y2="487" class="flow" marker-end="url(#ar)"/>
+
+  <!-- 2 perception -->
+  <g filter="url(#shadow)"><rect x="652" y="428" width="316" height="118" rx="10" class="card"/></g>
+  <rect x="652" y="428" width="316" height="4" rx="2" fill="#eda100"/>
+  <circle cx="672" cy="450" r="11" fill="#0b0b0b"/><text x="672" y="454.5" text-anchor="middle" font-size="12" font-weight="700" fill="#fcfcfb">2</text>
+  <text x="690" y="455" class="ct">Perception gate</text>
+  <text x="820" y="455" class="file mono" font-size="11.5">perception.py</text>
+  <g font-size="9.5" font-weight="700" fill="#fcfcfb">
+    <rect x="666" y="466" width="62" height="18" rx="9" fill="#898781"/><text x="697" y="478.5" text-anchor="middle">UNAWARE</text>
+    <rect x="740" y="466" width="62" height="18" rx="9" fill="#eda100"/><text x="771" y="478.5" text-anchor="middle">NOTICED</text>
+    <rect x="814" y="466" width="66" height="18" rx="9" fill="#eb6834"/><text x="847" y="478.5" text-anchor="middle">YIELDING</text>
+    <rect x="892" y="466" width="62" height="18" rx="9" fill="#1baf7a"/><text x="923" y="478.5" text-anchor="middle">HOLD</text>
+  </g>
+  <line x1="729" y1="475" x2="738" y2="475" class="flow" stroke-width="1.2" marker-end="url(#ar)"/>
+  <line x1="803" y1="475" x2="812" y2="475" class="flow" stroke-width="1.2" marker-end="url(#ar)"/>
+  <line x1="881" y1="475" x2="890" y2="475" class="flow" stroke-width="1.2" marker-end="url(#ar)"/>
+  <text x="666" y="503" class="t2">detect by range · lognormal reaction delay (median 1 s)</text>
+  <text x="666" y="519" class="t2">5 % never comply · escape side σ held with hysteresis</text>
+  <text x="666" y="537" class="eqs">u = max[ ς((T<tspan baseline-shift="sub" font-size="9">eff</tspan> − t<tspan baseline-shift="sub" font-size="9">arr</tspan>)/σ<tspan baseline-shift="sub" font-size="9">t</tspan>),  J · ς((R<tspan baseline-shift="sub" font-size="9">urg</tspan> − s)/σ<tspan baseline-shift="sub" font-size="9">s</tspan>) ]</text>
+
+  <line x1="970" y1="487" x2="986" y2="487" class="flow" marker-end="url(#ar)"/>
+
+  <!-- 3 lane change -->
+  <g filter="url(#shadow)"><rect x="988" y="428" width="216" height="118" rx="10" class="card"/></g>
+  <rect x="988" y="428" width="216" height="4" rx="2" fill="#2a78d6"/>
+  <circle cx="1008" cy="450" r="11" fill="#0b0b0b"/><text x="1008" y="454.5" text-anchor="middle" font-size="12" font-weight="700" fill="#fcfcfb">3</text>
+  <text x="1026" y="455" class="ct">Lane-change choice</text>
+  <text x="1004" y="474" class="file mono" font-size="11.5">lanechange.py</text>
+  <text x="1004" y="493" class="t2">commit to a lane when</text>
+  <text x="1004" y="511" class="eqs">A<tspan baseline-shift="sub" font-size="9">pass</tspan> φ (1 − φ<tspan baseline-shift="sub" font-size="9">tgt</tspan>) &gt; a<tspan baseline-shift="sub" font-size="9">pin</tspan><tspan baseline-shift="super" font-size="9">eff</tspan></text>
+  <text x="1004" y="527" class="t2">φ = frustration with leader</text>
+  <text x="1004" y="541" class="xs">latched push · closing-time gap veto</text>
+
+  <line x1="800" y1="548" x2="800" y2="562" class="flow" marker-end="url(#ar)"/>
+
+  <!-- 4 forces -->
+  <g filter="url(#shadow)"><rect x="396" y="564" width="808" height="206" rx="10" class="card"/></g>
+  <circle cx="416" cy="585" r="11" fill="#0b0b0b"/><text x="416" y="589.5" text-anchor="middle" font-size="12" font-weight="700" fill="#fcfcfb">4</text>
+  <text x="434" y="590" class="ct">Superimposed specific forces (m/s²)</text>
+  <text x="706" y="590" class="file mono" font-size="11.5">forces.total()</text>
+
+  <!-- tiles row 1: host traffic -->
+  <g>
+    <rect x="410" y="602" width="256" height="72" rx="7" fill="#f3f7fd" stroke="#cde2fb"/>
+    <text x="422" y="620" class="tx" font-weight="700">Drive</text>
+    <text x="422" y="642" class="eq">(v⁰ x̂ − <tspan font-weight="700">v</tspan>) / τ</text>
+    <text x="422" y="663" class="sm">relax toward desired speed</text>
+
+    <rect x="676" y="602" width="256" height="72" rx="7" fill="#f3f7fd" stroke="#cde2fb"/>
+    <text x="688" y="620" class="tx" font-weight="700">Car–car</text>
+    <text x="752" y="620" class="xs">elliptic + near-field body term</text>
+    <text x="688" y="642" class="eqs">[A<tspan baseline-shift="sub" font-size="9">v</tspan>e<tspan baseline-shift="super" font-size="9">−q</tspan> + A<tspan baseline-shift="sub" font-size="9">n</tspan>e<tspan baseline-shift="super" font-size="9">−q/q<tspan font-size="7">n</tspan></tspan>] w(φ) ĝ</text>
+    <text x="688" y="663" class="sm">IDM (Intelligent Driver Model) caps it</text>
+
+    <rect x="942" y="602" width="252" height="72" rx="7" fill="#f3f7fd" stroke="#cde2fb"/>
+    <text x="954" y="620" class="tx" font-weight="700">Lane keeping</text>
+    <text x="1054" y="620" class="xs">+ walls, damping ζ</text>
+    <text x="954" y="642" class="eqs">−a<tspan baseline-shift="sub" font-size="9">pin</tspan><tspan baseline-shift="super" font-size="9">eff</tspan> sin(2π (y − w/2) / w)</text>
+    <text x="954" y="663" class="sm">a<tspan baseline-shift="sub" font-size="8">pin</tspan><tspan baseline-shift="super" font-size="8">eff</tspan> = a<tspan baseline-shift="sub" font-size="8">pin</tspan>(ρ/ρ<tspan baseline-shift="sub" font-size="8">ref</tspan>)<tspan baseline-shift="super" font-size="8">kρ</tspan>(1 − relief·u)</text>
+  </g>
+  <!-- tiles row 2: EV terms + incentive -->
+  <g>
+    <rect x="410" y="682" width="256" height="72" rx="7" fill="#fdf3f2" stroke="#f2b1b0"/>
+    <text x="422" y="700" class="tx" font-weight="700">EV point field</text>
+    <text x="528" y="700" class="xs">forward-focused, λ = 0.1</text>
+    <text x="422" y="722" class="eqs" font-size="12.5">A<tspan baseline-shift="sub" font-size="9">ev</tspan>e<tspan baseline-shift="super" font-size="9">(r−d)/B<tspan font-size="7">ev</tspan></tspan>[λ + (1−λ)(1+cos φ)/2] n̂</text>
+    <text x="422" y="743" class="sm">“clear the box” near the EV</text>
+
+    <rect x="676" y="682" width="256" height="72" rx="7" fill="#fdf3f2" stroke="#e34948" stroke-width="1.5"/>
+    <text x="688" y="700" class="tx" font-weight="700">Corridor field</text>
+    <rect x="786" y="690" width="64" height="15" rx="7.5" fill="#e34948"/><text x="818" y="701" text-anchor="middle" font-size="9" font-weight="700" fill="#fcfcfb">KEY TERM</text>
+    <text x="688" y="722" class="eqs" font-size="12.5">F<tspan baseline-shift="sub" font-size="9">⊥</tspan> = A<tspan baseline-shift="sub" font-size="9">c</tspan> e<tspan baseline-shift="super" font-size="9">−(|d|−w<tspan font-size="7">need</tspan>)₊/B<tspan font-size="7">c</tspan></tspan> u f(s) σ</text>
+    <text x="688" y="743" class="sm">+ longitudinal brake: pull over &amp; slow down</text>
+
+    <rect x="942" y="682" width="252" height="72" rx="7" fill="#f3f7fd" stroke="#cde2fb"/>
+    <text x="954" y="700" class="tx" font-weight="700">Lane incentive</text>
+    <text x="954" y="722" class="eqs">a<tspan baseline-shift="sub" font-size="9">y</tspan> = ± A<tspan baseline-shift="sub" font-size="9">pass</tspan> / A<tspan baseline-shift="sub" font-size="9">keep</tspan>  while committed</text>
+    <text x="954" y="743" class="sm">a faster follower and the EV push alike</text>
+  </g>
+  <text x="410" y="765" class="xs" style="fill:#c23a39">EV and corridor terms act only on drivers in YIELDING / HOLD, scaled by urgency u</text>
+
+
+  <!-- 5 dynamics + composition bar -->
+  <g filter="url(#shadow)"><rect x="396" y="778" width="808" height="40" rx="10" fill="#0b0b0b"/></g>
+  <circle cx="416" cy="798" r="11" fill="#fcfcfb"/><text x="416" y="802.5" text-anchor="middle" font-size="12" font-weight="700" fill="#0b0b0b">5</text>
+  <text x="436" y="803" font-size="14" fill="#fcfcfb" font-family="'STIX Two Math','Cambria Math','Times New Roman',serif">aₓ = drive + <tspan font-weight="700">min</tspan>( F<tspan baseline-shift="sub" font-size="9">cc</tspan> + F<tspan baseline-shift="sub" font-size="9">EV</tspan> + F<tspan baseline-shift="sub" font-size="9">corr</tspan> ,  a<tspan baseline-shift="sub" font-size="9">IDM</tspan> )</text>
+  <text x="736" y="803" font-size="12" fill="#c3c2b7">safety always wins  →  clamp lateral a, v  →  semi-implicit Euler</text>
+  <text x="1188" y="803" text-anchor="end" font-size="11" fill="#9ec5f4" class="mono">dynamics.py</text>
+
+  <!-- loop-back arrow -->
+  <path d="M 396 798 L 388 798 L 388 487 L 394 487" class="flow" marker-end="url(#ar)"/>
+  <text x="384" y="660" class="lab" transform="rotate(-90 384 660)" text-anchor="middle">next step</text>
+
+  <!-- ==================== ③ MEASUREMENT (col 3) ==================== -->
+  <text x="1260" y="160" class="sec"><tspan class="secn">③</tspan> MEASUREMENT &amp; ANALYSIS</text>
+
+  <!-- History -->
+  <g filter="url(#shadow)"><rect x="1260" y="175" width="300" height="64" rx="10" class="card"/></g>
+  <text x="1278" y="200" class="ct">Trajectory History</text>
+  <text x="1418" y="200" class="file mono" font-size="11.5">simulate.py</text>
+  <text x="1278" y="222" class="t2">x, y, v, aₓ, awareness state, urgency, side</text>
+
+  <line x1="1410" y1="241" x2="1410" y2="255" class="flow" marker-end="url(#ar)"/>
+
+  <!-- metrics -->
+  <g filter="url(#shadow)"><rect x="1260" y="257" width="300" height="196" rx="10" class="card"/></g>
+  <text x="1278" y="282" class="ct">Behavioural metrics</text>
+  <text x="1278" y="300" class="file mono" font-size="11.5">metrics.py · evaluate()</text>
+  <g class="t2">
+    <text x="1278" y="322"><tspan font-weight="700" fill="#0b0b0b">progress</tspan>  EV speed / desired, clearance</text>
+    <text x="1278" y="340"><tspan font-weight="700" fill="#0b0b0b">safety</tspan>  min time-to-collision, collisions</text>
+    <text x="1278" y="358"><tspan font-weight="700" fill="#0b0b0b">comfort</tspan>  peak decel., lateral accel.</text>
+    <text x="1278" y="376"><tspan font-weight="700" fill="#0b0b0b">timing</tspan>  yield onset, corridor-open time</text>
+    <text x="1278" y="394"><tspan font-weight="700" fill="#0b0b0b">traffic</tspan>  lane changes, headway pools</text>
+  </g>
+  <rect x="1274" y="406" width="272" height="38" rx="6" fill="#e3eefb"/>
+  <text x="1284" y="421" class="sm" style="fill:#104281">the same lane-change detector runs on highD</text>
+  <text x="1284" y="436" class="sm" style="fill:#104281">→ model and data measured by one code path</text>
+
+  <!-- terms -->
+  <g filter="url(#shadow)"><rect x="1260" y="468" width="300" height="100" rx="10" class="card"/></g>
+  <text x="1278" y="493" class="ct">Per-term influence</text>
+  <text x="1418" y="493" class="file mono" font-size="11.5">terms.py</text>
+  <text x="1278" y="514" class="t2">term registry · force budget per term</text>
+  <text x="1278" y="532" class="t2">leave-one-term-out ablations</text>
+  <text x="1278" y="550" class="t2">term × observable attribution</text>
+
+  <!-- depinning -->
+  <g filter="url(#shadow)"><rect x="1260" y="583" width="300" height="180" rx="10" class="card"/></g>
+  <text x="1278" y="608" class="ct">Theory: depinning transition</text>
+  <text x="1278" y="628" class="t2">a car leaves its lane iff</text>
+  <text x="1432" y="628" class="eqs">A<tspan baseline-shift="sub" font-size="9">c</tspan> u &gt; a<tspan baseline-shift="sub" font-size="9">pin</tspan><tspan baseline-shift="super" font-size="9">eff</tspan></text>
+  <text x="1278" y="652" class="eq">d* = w<tspan baseline-shift="sub" font-size="9">need</tspan> + B<tspan baseline-shift="sub" font-size="9">c</tspan> ln(A<tspan baseline-shift="sub" font-size="9">c</tspan> / a<tspan baseline-shift="sub" font-size="9">pin</tspan><tspan baseline-shift="super" font-size="9">eff</tspan>)</text>
+  <text x="1278" y="668" class="xs">cleared half-width, closed form</text>
+  <!-- mini phase diagram -->
+  <g transform="translate(1290,676)">
+    <polygon points="0,78 0,0 78,0" fill="#fbe4e3"/>
+    <polygon points="0,78 78,78 78,0" fill="#e3eefb"/>
+    <line x1="0" y1="78" x2="78" y2="0" stroke="#0b0b0b" stroke-width="1.2" stroke-dasharray="4 3"/>
+    <line x1="0" y1="78" x2="84" y2="78" stroke="#898781" marker-end="url(#dim)"/>
+    <line x1="0" y1="78" x2="0" y2="-4" stroke="#898781" marker-end="url(#dim)"/>
+    <text x="8" y="16" font-size="9" fill="#c23a39">corridor opens</text>
+    <text x="36" y="70" font-size="9" fill="#104281">pinned</text>
+    <text x="84" y="90" text-anchor="end" font-size="9" fill="#52514e">a_pin</text>
+    <text x="-6" y="6" text-anchor="end" font-size="9" fill="#52514e">A_c</text>
+  </g>
+  <text x="1392" y="700" class="sm">phase boundary</text>
+  <text x="1392" y="714" class="sm">A_c ≈ a_pin measured</text>
+  <text x="1392" y="728" class="sm">in density sweeps;</text>
+  <text x="1392" y="742" class="sm">bow-wave plateau ≈ d*</text>
+
+  <!-- viz -->
+  <g filter="url(#shadow)"><rect x="1260" y="778" width="300" height="47" rx="10" class="card"/></g>
+  <text x="1278" y="798" class="ct">Figures</text>
+  <text x="1340" y="798" class="file mono" font-size="11.5">viz.py</text>
+  <text x="1278" y="815" class="sm">animations · space-time · bow wave · force field · phase</text>
+
+  <!-- ===== inter-column flows ===== -->
+  <path d="M 340 300 L 378 300" class="flow" marker-end="url(#ar)"/>
+  <text x="358" y="292" text-anchor="middle" class="xs">θ</text>
+  <path d="M 340 470 L 378 470" class="flow" marker-end="url(#ar)"/>
+  <text x="358" y="462" text-anchor="middle" class="xs">init</text>
+  <path d="M 1204 798 L 1240 798 L 1240 207 L 1256 207" class="flow" marker-end="url(#ar)"/>
+
+  <!-- ==================== ④ IDENTIFICATION ==================== -->
+  <text x="40" y="880" class="sec"><tspan class="secn">④</tspan> TWO-STAGE IDENTIFICATION</text>
+  <text x="890" y="880" text-anchor="end" class="sm"><tspan class="mono">calibrate.py</tspan> · Latin hypercube + Nelder–Mead · no scipy</text>
+  <rect x="40" y="895" width="860" height="300" rx="12" fill="#eaf6f0"/>
+
+  <!-- data -> stages -->
+  <path d="M 310 825 L 310 910" class="flowb" marker-end="url(#arB)"/>
+  <text x="318" y="852" class="lab" style="fill:#2a78d6">targets</text>
+  <!-- sim observables -> stages -->
+  <path d="M 540 825 L 540 910" class="flowg" marker-end="url(#arG)"/>
+  <text x="548" y="852" class="lab" style="fill:#128a60">simulated observables</text>
+
+  <!-- stage 1 -->
+  <g filter="url(#shadow)"><rect x="60" y="912" width="390" height="208" rx="10" class="card"/></g>
+  <rect x="60" y="912" width="390" height="5" rx="2" fill="#2a78d6"/>
+  <text x="78" y="942" class="ct">Stage 1 · ordinary traffic, EV absent</text>
+  <text x="78" y="960" class="file mono" font-size="11.5">run_normal_calibration.py</text>
+  <text x="78" y="984" class="tx">fit 19 parameters in three blocks:</text>
+  <g font-size="11" class="mono">
+    <rect x="78" y="993" width="118" height="22" rx="5" fill="#e3eefb"/><text x="137" y="1008" text-anchor="middle" fill="#104281">car-following 8</text>
+    <rect x="202" y="993" width="104" height="22" rx="5" fill="#e3eefb"/><text x="254" y="1008" text-anchor="middle" fill="#104281">lateral 7</text>
+    <rect x="312" y="993" width="122" height="22" rx="5" fill="#e3eefb"/><text x="373" y="1008" text-anchor="middle" fill="#104281">lane changing 4</text>
+  </g>
+  <text x="78" y="1036" class="t2">target: highD headway, time-to-collision,</text>
+  <text x="78" y="1052" class="t2">accelerations, lane-change rate and shape</text>
+  <text x="78" y="1068" class="t2">free-flow + dense fitted · congested held out</text>
+  <rect x="78" y="1082" width="140" height="26" rx="6" fill="#2a78d6"/>
+  <text x="148" y="1099" text-anchor="middle" font-size="12" font-weight="700" fill="#fcfcfb" class="mono">TUNED_NORMAL</text>
+
+  <!-- stage arrow -->
+  <path d="M 452 1016 L 486 1016" class="flowg" stroke-width="2.2" marker-end="url(#arG)"/>
+  <text x="469" y="1004" text-anchor="middle" class="xs">freeze</text>
+
+  <!-- stage 2 -->
+  <g filter="url(#shadow)"><rect x="490" y="912" width="390" height="208" rx="10" class="card"/></g>
+  <rect x="490" y="912" width="390" height="5" rx="2" fill="#e34948"/>
+  <text x="508" y="942" class="ct">Stage 2 · add the emergency vehicle</text>
+  <text x="508" y="960" class="file mono" font-size="11.5">run_ev_calibration.py</text>
+  <text x="508" y="984" class="tx">stage-1 block frozen; fit only the repulsion:</text>
+  <g font-size="11" class="mono">
+    <rect x="508" y="993" width="176" height="22" rx="5" fill="#fbe4e3"/><text x="596" y="1008" text-anchor="middle" fill="#8f1d1d">A_ev, B_ev  point field</text>
+    <rect x="690" y="993" width="172" height="22" rx="5" fill="#fbe4e3"/><text x="776" y="1008" text-anchor="middle" fill="#8f1d1d">A_c, B_c  corridor</text>
+  </g>
+  <text x="508" y="1036" class="t2">target: dashcam behaviour fingerprint</text>
+  <text x="508" y="1052" class="t2">(yield / brake / fail shares, onset, lateral speed)</text>
+  <text x="508" y="1068" class="t2">+ safety and comfort guards in the loss</text>
+  <rect x="508" y="1082" width="164" height="26" rx="6" fill="#e34948"/>
+  <text x="590" y="1099" text-anchor="middle" font-size="12" font-weight="700" fill="#fcfcfb" class="mono">TUNED_BLUELIGHT</text>
+
+  <!-- validation strip -->
+  <text x="60" y="1146" class="tx" font-weight="700">Validation</text>
+  <text x="140" y="1146" class="t2">fresh seeds · held-out highD locations · acceptance bar = the data’s own leave-one-out spread</text>
+  <text x="60" y="1168" class="tx" font-weight="700">Why two stages</text>
+  <text x="170" y="1168" class="t2">EV-induced lane changes must never be what identifies ordinary driving;</text>
+  <text x="170" y="1184" class="t2">the EV block is then the only thing left free to explain the yielding.</text>
+
+
+  <!-- fitted presets feed back to params -->
+  <path d="M 60 1095 L 24 1095 L 24 322 L 56 322" class="flowg" marker-end="url(#arG)"/>
+  <text x="18" y="720" class="lab" transform="rotate(-90 18 720)" text-anchor="middle" style="fill:#128a60">fitted presets written back to params.py</text>
+
+  <!-- ==================== ⑤ COUPLINGS ==================== -->
+  <text x="940" y="880" class="sec"><tspan class="secn">⑤</tspan> COUPLINGS &amp; TOOLS</text>
+  <rect x="940" y="895" width="620" height="300" rx="12" fill="#efedf8"/>
+
+  <path d="M 1160 825 L 1160 910" class="flowv" marker-end="url(#arV)"/>
+  <text x="1168" y="852" class="lab" style="fill:#4a3aa7">same force + perception code</text>
+
+  <g filter="url(#shadow)"><rect x="958" y="912" width="288" height="172" rx="10" class="card"/></g>
+  <rect x="958" y="912" width="288" height="5" rx="2" fill="#4a3aa7"/>
+  <text x="976" y="942" class="ct">SUMO 1.26 hybrid bridge</text>
+  <text x="976" y="960" class="file mono" font-size="11.5">emv/sumo/bridge.py · TraCI</text>
+  <text x="976" y="983" class="t2">SUMO keeps car-following authority;</text>
+  <text x="976" y="999" class="t2">the bridge sends bounded, vetoed</text>
+  <text x="976" y="1015" class="t2">slow-down and sub-lane requests</text>
+  <text x="976" y="1040" class="tx" font-weight="600">yielding modes compared</text>
+  <g font-size="10.5" class="mono">
+    <rect x="976" y="1050" width="46" height="20" rx="5" fill="#f2f1ec"/><text x="999" y="1064" text-anchor="middle">none</text>
+    <rect x="1028" y="1050" width="76" height="20" rx="5" fill="#f2f1ec"/><text x="1066" y="1064" text-anchor="middle">bluelight</text>
+    <rect x="1110" y="1050" width="52" height="20" rx="5" fill="#ddd9f3"/><text x="1136" y="1064" text-anchor="middle">force</text>
+    <rect x="1168" y="1050" width="46" height="20" rx="5" fill="#f2f1ec"/><text x="1191" y="1064" text-anchor="middle">rule</text>
+  </g>
+
+  <g filter="url(#shadow)"><rect x="1258" y="912" width="288" height="172" rx="10" class="card"/></g>
+  <rect x="1258" y="912" width="288" height="5" rx="2" fill="#4a3aa7"/>
+  <text x="1276" y="942" class="ct">Unreal Engine 5.8 game</text>
+  <text x="1276" y="960" class="file mono" font-size="11.5">emv/ue/ · TCP/JSON protocol</text>
+  <text x="1276" y="983" class="t2">you drive the EV in Unreal;</text>
+  <text x="1276" y="999" class="t2">the Python brain drives all other cars</text>
+  <text x="1276" y="1015" class="t2">(50 Hz, live top-down view)</text>
+  <text x="1276" y="1040" class="tx" font-weight="600">who decides the reaction</text>
+  <g font-size="10.5" class="mono">
+    <rect x="1276" y="1050" width="66" height="20" rx="5" fill="#ddd9f3"/><text x="1309" y="1064" text-anchor="middle">physics</text>
+    <rect x="1348" y="1050" width="76" height="20" rx="5" fill="#f2f1ec"/><text x="1386" y="1064" text-anchor="middle">bluelight</text>
+    <rect x="1430" y="1050" width="46" height="20" rx="5" fill="#f2f1ec"/><text x="1453" y="1064" text-anchor="middle">none</text>
+  </g>
+
+  <!-- tools -->
+  <text x="958" y="1112" class="tx" font-weight="700">Tools</text>
+  <text x="1010" y="1112" class="mono" font-size="11.5" fill="#4a3aa7">live_lab.py</text>
+  <text x="1098" y="1112" class="t2">sliders edit Params mid-run; the depinning verdict updates live</text>
+  <text x="1010" y="1132" class="mono" font-size="11.5" fill="#4a3aa7">play_sumo.py</text>
+  <text x="1106" y="1132" class="t2">sumo-gui demo, cars coloured by awareness state</text>
+  <text x="1010" y="1152" class="mono" font-size="11.5" fill="#4a3aa7">start_demo.py</text>
+  <text x="1112" y="1152" class="t2">one command: brain + view + Unreal</text>
+  <text x="958" y="1180" class="tx" font-weight="700">Real-time budget</text>
+  <text x="1080" y="1180" class="t2">2.6 ms per update at 113 vehicles ≈ 5 % of one core</text>
+
+  <!-- ==================== ⑥ REPRODUCIBILITY ==================== -->
+  <text x="40" y="1232" class="sec"><tspan class="secn">⑥</tspan> REPRODUCIBILITY LAYER</text>
+  <rect x="40" y="1246" width="1520" height="140" rx="12" fill="#fcfcfb" stroke="#e1e0d9"/>
+
+  <!-- pipeline: experiments -> out -> figures ; runlog ledger -->
+  <g>
+    <rect x="62" y="1266" width="250" height="100" rx="8" fill="#f2f1ec"/>
+    <text x="78" y="1290" class="tx" font-weight="700">experiments/run_*.py</text>
+    <text x="78" y="1310" class="t2">calibration, multi-seed stats,</text>
+    <text x="78" y="1326" class="t2">phase sweeps, ablations,</text>
+    <text x="78" y="1342" class="t2">SUMO and dashcam benchmarks</text>
+
+    <line x1="314" y1="1316" x2="346" y2="1316" class="flow" marker-end="url(#ar)"/>
+
+    <rect x="348" y="1266" width="220" height="100" rx="8" fill="#f2f1ec"/>
+    <text x="364" y="1290" class="tx" font-weight="700">out/*.json · *.npz</text>
+    <text x="364" y="1310" class="t2">numbers of record</text>
+    <line x1="570" y1="1316" x2="602" y2="1316" class="flow" marker-end="url(#ar)"/>
+    <rect x="604" y="1266" width="236" height="100" rx="8" fill="#f2f1ec"/>
+    <text x="620" y="1290" class="tx" font-weight="700">make_*_figs.py</text>
+    <text x="620" y="1310" class="t2">figures, animations, tables</text>
+    <text x="620" y="1326" class="t2">rebuilt from stored records,</text>
+    <text x="620" y="1342" class="t2">never from re-runs</text>
+
+    <!-- ledger -->
+    <path d="M 187 1366 L 187 1376 L 890 1376 L 890 1316 L 908 1316" class="flow" stroke-dasharray="4 3" marker-end="url(#ar)"/>
+    <rect x="910" y="1266" width="300" height="100" rx="8" fill="#0b0b0b"/>
+    <text x="928" y="1290" font-size="12.5" font-weight="700" fill="#fcfcfb" class="mono">emv/runlog.py</text>
+    <text x="928" y="1310" font-size="12" fill="#c3c2b7">every run appends params, metrics and</text>
+    <text x="928" y="1326" font-size="12" fill="#c3c2b7">outputs to <tspan class="mono" fill="#fcfcfb">logs/runs.jsonl</tspan> (append-only)</text>
+    <text x="928" y="1342" font-size="12" fill="#c3c2b7">→ <tspan class="mono" fill="#fcfcfb">logs/LATEST.md</tspan> · <tspan class="mono" fill="#fcfcfb">PROJECT_LOG.md</tspan></text>
+
+    <rect x="1230" y="1266" width="310" height="100" rx="8" fill="#f2f1ec"/>
+    <text x="1246" y="1290" class="tx" font-weight="700">Guards</text>
+    <text x="1246" y="1310" class="t2"><tspan class="mono" font-size="11.5">tests/smoke.py</tspan>  model vs baselines</text>
+    <text x="1246" y="1326" class="t2"><tspan class="mono" font-size="11.5">tests/test_highd.py</tspan>  records reproduce</text>
+    <text x="1246" y="1342" class="t2"><tspan class="mono" font-size="11.5">tests/test_ue_bridge.py</tspan>  wire + coords</text>
+    <text x="1246" y="1358" class="xs">numpy + matplotlib only · no scipy, no pandas</text>
+  </g>
+
+  <text x="1560" y="1408" text-anchor="end" class="xs">Source: README.md, docs/FRAMEWORK.md, docs/TERM_INFLUENCE.md, emv/*.py · symbols as in docs/FRAMEWORK.md</text>
+</svg>

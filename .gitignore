@@ -1,0 +1,20 @@
+# Python environments and bytecode
+.venv/
+__pycache__/
+*.py[cod]
+
+# Generated experiments, logs, and artifacts
+out/
+logs/*.jsonl
+logs/LATEST.md
+*.log
+
+# Unreal Engine generated files
+ue_game/EmvHighway/Binaries/
+ue_game/EmvHighway/DerivedDataCache/
+ue_game/EmvHighway/Intermediate/
+ue_game/EmvHighway/Saved/
+
+# Local operating-system files
+.DS_Store
+Thumbs.db

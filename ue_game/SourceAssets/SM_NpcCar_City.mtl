@@ -1,0 +1,6 @@
+newmtl Body
+Kd 0.5 0.5 0.5
+
+newmtl Trim
+Kd 0.5 0.5 0.5
+
